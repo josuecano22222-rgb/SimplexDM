@@ -153,10 +153,13 @@ class ShareLocationManager {
         const c = Cesium.Cartographic.fromCartesian(camera.position);
         const lon = Cesium.Math.toDegrees(c.longitude);
         const lat = Cesium.Math.toDegrees(c.latitude);
-        const height = c.height || 0;
-        const heading = ((Cesium.Math.toDegrees(camera.heading) % 360) + 360) % 360;
-        const pitch = Cesium.Math.toDegrees(camera.pitch);
-        const roll = Cesium.Math.toDegrees(camera.roll);
+        const height = Number.isFinite(c.height) ? c.height : 0;
+        const rawH = Number.isFinite(camera.heading) ? Cesium.Math.toDegrees(camera.heading) : 0;
+        const heading = Number.isFinite(rawH) ? ((rawH % 360) + 360) % 360 : 0;
+        const rawP = Number.isFinite(camera.pitch) ? Cesium.Math.toDegrees(camera.pitch) : -90;
+        const pitch = Number.isFinite(rawP) ? rawP : -90;
+        const rawR = Number.isFinite(camera.roll) ? Cesium.Math.toDegrees(camera.roll) : 0;
+        const roll = Number.isFinite(rawR) ? rawR : 0;
         const utm = window.CoordinateManager?.wgs84ToUtm?.(lon, lat) || null;
         return { lon, lat, height, heading, pitch, roll, utm };
     }
@@ -312,14 +315,17 @@ class ShareLocationManager {
         const camera = viewer.camera;
 
         const carto = Cesium.Cartographic.fromCartesian(camera.position);
+        const rawH = Number.isFinite(camera.heading) ? Cesium.Math.toDegrees(camera.heading) : 0;
+        const rawP = Number.isFinite(camera.pitch) ? Cesium.Math.toDegrees(camera.pitch) : -90;
+        const rawR = Number.isFinite(camera.roll) ? Cesium.Math.toDegrees(camera.roll) : 0;
         const state = {
             v: 1,
             lat: Cesium.Math.toDegrees(carto.latitude),
             lon: Cesium.Math.toDegrees(carto.longitude),
-            alt: carto.height,
-            heading: Cesium.Math.toDegrees(camera.heading),
-            pitch: Cesium.Math.toDegrees(camera.pitch),
-            roll: Cesium.Math.toDegrees(camera.roll),
+            alt: Number.isFinite(carto.height) ? carto.height : 0,
+            heading: Number.isFinite(rawH) ? rawH : 0,
+            pitch: Number.isFinite(rawP) ? rawP : -90,
+            roll: Number.isFinite(rawR) ? rawR : 0,
             ts: Date.now()
         };
 

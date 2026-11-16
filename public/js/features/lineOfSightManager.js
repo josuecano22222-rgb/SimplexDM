@@ -266,14 +266,44 @@
             el.style.display = hide ? 'none' : '';
         }
 
+        function escapeHtml(str) {
+            return String(str == null ? '' : str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function cleanupToolbarKnockout(host) {
+            if (subD1 && typeof subD1.dispose === 'function') subD1.dispose();
+            if (subD2 && typeof subD2.dispose === 'function') subD2.dispose();
+            subD1 = null;
+            subD2 = null;
+            vko = null;
+            if (!host) return;
+            const koRef = window.ko;
+            if (koRef && typeof koRef.cleanNode === 'function') {
+                try {
+                    Array.prototype.slice.call(host.children).forEach(function (child) {
+                        koRef.cleanNode(child);
+                    });
+                    koRef.cleanNode(host);
+                } catch (_) {
+                    /* ignore stale Knockout node cleanup errors */
+                }
+            }
+            host.innerHTML = '';
+        }
+
         function injectToolbarKnockout() {
             const host = document.getElementById('toolbarLOS');
-            if (!host || host.children.length > 0) return;
+            if (!host) return;
+            if (host.querySelector('#form-nameHeight') && (vko || !window.ko)) return;
+
+            cleanupToolbarKnockout(host);
+
             const convCurr = window.convertToCurrUnit || function (m) {
                 return m;
-            };
-            const convM = window.convertToMetersIfNecessary || function (x) {
-                return x;
             };
             const i18n = window.smart3dI18n && window.smart3dI18n.t ? window.smart3dI18n.t : function (k) {
                 return k;
@@ -281,15 +311,27 @@
 
             const maxDisp = convCurr(10);
             const stepDisp = convCurr(0.1);
+            const isRtl =
+                window.Lan === 'He' ||
+                window.Lan === 'Ar' ||
+                (window.appI18n && typeof window.appI18n.getLanguage === 'function' && window.appI18n.getLanguage() === 'ar') ||
+                (typeof document !== 'undefined' && document.documentElement && document.documentElement.dir === 'rtl');
 
-            host.setAttribute('dir', window.Lan === 'He' ? 'rtl' : 'ltr');
+            host.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
 
+            // Mount into a freshly created child node so Knockout bindings are never
+            // re-applied onto the persistent #toolbarLOS container across toggles.
+            const mount = document.createElement('div');
+            mount.className = 'los-toolbar-mount';
+            host.appendChild(mount);
+
+            const titleSafe = escapeHtml(i18n('lineOfSight.title'));
             const koRef = window.ko;
-            if (koRef) {
-                host.innerHTML =
+            if (koRef && typeof koRef.applyBindings === 'function') {
+                mount.innerHTML =
                     '<fieldset id="form-nameHeight">' +
                     '<legend>' +
-                    i18n('lineOfSight.title') +
+                    titleSafe +
                     '</legend>' +
                     '<table id="tableHeight">' +
                     '<tr><td data-bind="text: heightOffsetSLabel"></td><td>' +
@@ -309,7 +351,7 @@
                     heightE: koRef.observable(convCurr(0))
                 };
 
-                koRef.applyBindings(vko, host);
+                koRef.applyBindings(vko, mount);
 
                 subD1 = vko.heightS.subscribe(function () {
                     if (typeof window._losOffsetApply === 'function') window._losOffsetApply();
@@ -318,14 +360,14 @@
                     if (typeof window._losOffsetApply === 'function') window._losOffsetApply();
                 });
             } else {
-                host.innerHTML =
+                mount.innerHTML =
                     '<fieldset id="form-nameHeight">' +
                     '<legend>' +
-                    i18n('lineOfSight.title') +
+                    titleSafe +
                     '</legend>' +
                     '<table id="tableHeight">' +
                     '<tr><td>' +
-                    i18n('lineOfSight.heightOffsetS') +
+                    escapeHtml(i18n('lineOfSight.heightOffsetS')) +
                     '</td><td>' +
                     '<input type="range" id="losRngS" min="0" max="' +
                     maxDisp +
@@ -334,7 +376,7 @@
                     '" value="0" />' +
                     '</td></tr>' +
                     '<tr><td>' +
-                    i18n('lineOfSight.heightOffsetE') +
+                    escapeHtml(i18n('lineOfSight.heightOffsetE')) +
                     '</td><td>' +
                     '<input type="range" id="losRngE" min="0" max="' +
                     maxDisp +
@@ -409,13 +451,8 @@
             const tb = document.getElementById('toolbarLOS');
             if (tb) {
                 tb.style.display = 'none';
-                tb.innerHTML = '';
             }
-            vko = null;
-            if (subD1 && typeof subD1.dispose === 'function') subD1.dispose();
-            if (subD2 && typeof subD2.dispose === 'function') subD2.dispose();
-            subD1 = null;
-            subD2 = null;
+            cleanupToolbarKnockout(tb);
             window._losOffsetApply = function () {};
 
             hideInfoBox(false);

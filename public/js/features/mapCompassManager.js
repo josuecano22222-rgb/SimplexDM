@@ -26,6 +26,8 @@
         constructor() {
             this._removeListener = null;
             this._drag = null;
+            this._lastFiniteHeading = 0;
+            this._lastRenderedDeg = null;
             this.initialized = false;
         }
 
@@ -88,12 +90,27 @@
             this.initialized = true;
         }
 
+        _readHeadingDeg(viewer) {
+            const rawRad = viewer && viewer.camera ? viewer.camera.heading : NaN;
+            if (typeof rawRad === 'number' && Number.isFinite(rawRad)) {
+                const rawDeg = Cesium.Math.toDegrees(rawRad);
+                if (Number.isFinite(rawDeg)) {
+                    this._lastFiniteHeading = normalizeDeg(rawDeg);
+                }
+            }
+            return Number.isFinite(this._lastFiniteHeading) ? this._lastFiniteHeading : 0;
+        }
+
         _syncRose(viewer) {
-            const h = Cesium.Math.toDegrees(viewer.camera.heading);
-            const deg = normalizeDeg(h);
+            const deg = this._readHeadingDeg(viewer);
+            if (this._lastRenderedDeg !== null && Math.abs(deg - this._lastRenderedDeg) < 0.02) {
+                return;
+            }
+            this._lastRenderedDeg = deg;
+            const rot = Number.isFinite(-deg) ? (-deg || 0) : 0;
             const roseEl = document.getElementById('mapCompassRose');
             if (roseEl) {
-                roseEl.setAttribute('transform', `rotate(${-h} 50 50)`);
+                roseEl.setAttribute('transform', `rotate(${rot} 50 50)`);
             }
             const degOut = document.getElementById('mapCompassHeadingText');
             const cardOut = document.getElementById('mapCompassCardinal');
@@ -102,17 +119,21 @@
         }
 
         _setHeading(deg) {
+            const safeDeg = normalizeDeg(deg);
+            this._lastFiniteHeading = safeDeg;
             if (window.navigationManager && typeof window.navigationManager.setHeadingDegrees === 'function') {
-                window.navigationManager.setHeadingDegrees(deg);
+                window.navigationManager.setHeadingDegrees(safeDeg);
             } else {
                 const v = getViewer();
-                if (!v) return;
+                if (!v || !v.camera) return;
                 const cam = v.camera;
+                const pitch = Number.isFinite(cam.pitch) ? cam.pitch : -Cesium.Math.PI_OVER_TWO;
+                const roll = Number.isFinite(cam.roll) ? cam.roll : 0;
                 cam.setView({
                     orientation: {
-                        heading: Cesium.Math.toRadians(normalizeDeg(deg)),
-                        pitch: cam.pitch,
-                        roll: cam.roll
+                        heading: Cesium.Math.toRadians(safeDeg),
+                        pitch: pitch,
+                        roll: roll
                     }
                 });
             }
@@ -148,7 +169,7 @@
 
             const startX = e.clientX;
             const startY = e.clientY;
-            const startH = normalizeDeg(Cesium.Math.toDegrees(viewer.camera.heading));
+            const startH = this._readHeadingDeg(viewer);
             let moved = false;
 
             const onMove = (ev) => {

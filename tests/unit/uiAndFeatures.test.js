@@ -172,4 +172,152 @@ describe('UI & Feature Module Regressions & Edge Cases', () => {
         const raster = new RasterService({ crsService: new CrsService() });
         await expect(raster.open('/nonexistent/dem.tif')).rejects.toThrow();
     });
+
+    test('MapCompassManager never writes rotate(NaN 50 50) when camera.heading is NaN or non-finite', () => {
+        document.body.innerHTML = `
+            <div id="mapCompassWidget">
+                <div id="mapCompassDial">
+                    <svg viewBox="0 0 100 100"><g id="mapCompassRose" transform="rotate(0 50 50)"></g></svg>
+                </div>
+                <span id="mapCompassHeadingText"></span>
+                <span id="mapCompassCardinal"></span>
+            </div>
+        `;
+        require('../../public/js/features/mapCompassManager');
+        const compass = window.mapCompassManager;
+        expect(compass).toBeDefined();
+        compass._lastFiniteHeading = 0;
+        compass._lastRenderedDeg = null;
+
+        const rose = document.getElementById('mapCompassRose');
+        const headingText = document.getElementById('mapCompassHeadingText');
+        const cardinal = document.getElementById('mapCompassCardinal');
+
+        // Initial nadir / polar startup frame where camera.heading is NaN
+        compass._syncRose({ camera: { heading: NaN } });
+        expect(rose.getAttribute('transform')).toBe('rotate(0 50 50)');
+        expect(headingText.textContent).toBe('0°');
+        expect(cardinal.textContent).toBe('N');
+
+        // Rotate to 90° East (π/2 rad)
+        compass._syncRose({ camera: { heading: Math.PI / 2 } });
+        expect(rose.getAttribute('transform')).toBe('rotate(-90 50 50)');
+        expect(headingText.textContent).toBe('90°');
+        expect(cardinal.textContent).toBe('E');
+
+        // Subsequent non-finite frames preserve last known finite heading (never NaN/Infinity)
+        for (const bad of [NaN, undefined, Infinity, -Infinity]) {
+            compass._lastRenderedDeg = null;
+            compass._syncRose({ camera: { heading: bad } });
+            const attr = rose.getAttribute('transform');
+            expect(attr).not.toContain('NaN');
+            expect(attr).not.toContain('Infinity');
+            expect(attr).toBe('rotate(-90 50 50)');
+        }
+    });
+
+    test('LineOfSight Knockout toolbar cleanly activates, deactivates, and switches tools repeatedly', () => {
+        const ko = require('../../public/js/vendor/knockout-min.js');
+        window.ko = ko;
+
+        document.body.innerHTML = `
+            <button id="lineofsight"></button>
+            <button id="viewshed"></button>
+            <div id="toolbarLOS" style="display:none"></div>
+            <div id="toolbarVSH" style="display:none"></div>
+            <div id="editmodel" style="display:none"></div>
+            <div class="cesium-viewer-infoBoxContainer"></div>
+        `;
+
+        const canvas = document.createElement('canvas');
+        const mockViewer = {
+            canvas,
+            scene: {
+                canvas,
+                pickPositionSupported: true,
+                globe: { shadows: 0 },
+                primitives: { add: jest.fn(), remove: jest.fn() },
+                requestRender: jest.fn(),
+            },
+            entities: {
+                add: jest.fn((e) => e),
+                remove: jest.fn(),
+                contains: jest.fn(() => false),
+                getById: jest.fn(() => null),
+            },
+            selectedEntityChanged: {
+                addEventListener: jest.fn(),
+                removeEventListener: jest.fn(),
+            },
+        };
+        const prevViewer = window.tilesetViewer;
+        const origHandler = global.Cesium.ScreenSpaceEventHandler;
+        const origEventType = global.Cesium.ScreenSpaceEventType;
+        const origShadowMode = global.Cesium.ShadowMode;
+        window.tilesetViewer = { viewer: mockViewer };
+        global.Cesium.ScreenSpaceEventType = { LEFT_CLICK: 0, LEFT_DOUBLE_CLICK: 1, MOUSE_MOVE: 15 };
+        global.Cesium.ShadowMode = { DISABLED: 0, ENABLED: 1 };
+        global.Cesium.ScreenSpaceEventHandler = function () {
+            this._destroyed = false;
+            this.setInputAction = jest.fn();
+            this.removeInputAction = jest.fn();
+            this.isDestroyed = () => this._destroyed;
+            this.destroy = () => {
+                this._destroyed = true;
+            };
+        };
+
+        try {
+            require('../../public/js/core/toolManager');
+            require('../../public/js/features/vshd');
+            require('../../public/js/features/visibleHiddenAreasManager');
+            require('../../public/js/features/lineOfSightManager');
+            window.lineOfSightManager.init();
+
+            const losTool = window.toolManager.getTool('createLineOfSight');
+            const vshTool = window.toolManager.getTool('viewshed');
+            expect(losTool).toBeDefined();
+            expect(vshTool).toBeDefined();
+
+            const toolbarLos = document.getElementById('toolbarLOS');
+
+            // Toggle Line of Sight on/off and switch Viewshed <-> Line of Sight 6 times
+            for (let i = 0; i < 6; i++) {
+                expect(() => {
+                    losTool.enabled = true;
+                }).not.toThrow();
+                expect(losTool.enabled).toBe(true);
+                expect(toolbarLos.style.display).toBe('inline-block');
+
+                const rngS = document.getElementById('losRngS');
+                const rngE = document.getElementById('losRngE');
+                expect(rngS).not.toBeNull();
+                expect(rngE).not.toBeNull();
+
+                let offsetCalls = 0;
+                window._losOffsetApply = () => {
+                    offsetCalls += 1;
+                };
+                rngS.value = '2.5';
+                rngS.dispatchEvent(new Event('input'));
+                expect(offsetCalls).toBeGreaterThanOrEqual(1);
+
+                if (i % 2 === 0) {
+                    losTool.enabled = false;
+                } else {
+                    vshTool.enabled = true;
+                    expect(losTool.enabled).toBe(false);
+                    vshTool.enabled = false;
+                }
+                expect(toolbarLos.style.display).toBe('none');
+                expect(toolbarLos.children.length).toBe(0);
+            }
+        } finally {
+            window.tilesetViewer = prevViewer;
+            global.Cesium.ScreenSpaceEventHandler = origHandler;
+            global.Cesium.ScreenSpaceEventType = origEventType;
+            global.Cesium.ShadowMode = origShadowMode;
+            delete window.ko;
+        }
+    });
 });

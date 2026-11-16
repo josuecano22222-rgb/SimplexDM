@@ -582,7 +582,9 @@
                     return;
                 }
                 if (!viewer.measure || !viewer.measure.viewModel) {
-                    if (window.notification && typeof window.notification.warning === 'function') {
+                    if (window.enhancedMeasurementManager && typeof window.enhancedMeasurementManager.toggle === 'function') {
+                        window.enhancedMeasurementManager.toggle();
+                    } else if (window.notification && typeof window.notification.warning === 'function') {
                         window.notification.warning(
                             window.appI18n && window.appI18n.nt
                                 ? window.appI18n.nt('measureToolsWait')
@@ -902,7 +904,7 @@
                 if (!viewer || !viewer.scene || viewer.scene.pickPositionSupported !== true) return;
 
                 const mt = tm.getTool('measureToolbar');
-                if (!mt || !mt.enabled) {
+                if (mt && !mt.enabled) {
                     tm.suspendExclusive(function () {
                         mt.enabled = true;
                     });
@@ -1722,11 +1724,18 @@
 
     function wireNorthArrowAndHistory(viewer) {
         if (!viewer || !viewer.scene) return;
+        var lastHeadingDeg = 0;
         viewer.scene.postRender.addEventListener(function () {
             var arrow = document.querySelector('.north-arrow');
-            if (arrow) {
-                var h = Cesium.Math.toDegrees(viewer.camera.heading);
-                arrow.style.setProperty('--rotation', -h + 'deg');
+            if (arrow && viewer.camera) {
+                var rawRad = viewer.camera.heading;
+                if (typeof rawRad === 'number' && Number.isFinite(rawRad)) {
+                    var deg = Cesium.Math.toDegrees(rawRad);
+                    if (Number.isFinite(deg)) {
+                        lastHeadingDeg = ((deg % 360) + 360) % 360;
+                    }
+                }
+                arrow.style.setProperty('--rotation', (-lastHeadingDeg || 0) + 'deg');
             }
             syncHistoryNavButtons();
         });
@@ -1882,60 +1891,65 @@
                 var cartos = positions.map(function (c) {
                     return Cesium.Cartographic.fromCartesian(c);
                 });
-                var tp = viewer.terrainProvider;
-                if (!tp) {
-                    if (window.notification && typeof window.notification.error === 'function') {
-                        window.notification.error(
-                            window.appI18n && window.appI18n.nt
-                                ? window.appI18n.nt('epNoTerrain')
-                                : 'No terrain provider available for elevation sampling.'
-                        );
-                    }
-                    return;
-                }
-                Cesium.sampleTerrainMostDetailed(tp, cartos)
-                    .then(function (updated) {
-                        var heights = updated.map(function (c) {
-                            return c.height;
-                        });
-                        var minH = Math.min.apply(null, heights);
-                        var maxH = Math.max.apply(null, heights);
-                        host.innerHTML = '';
-                        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                        svg.setAttribute('width', '100%');
-                        svg.setAttribute('height', '120');
-                        svg.setAttribute('viewBox', '0 0 300 120');
-                        var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                        var pts = heights.map(function (h, i) {
-                            var x = (i / Math.max(heights.length - 1, 1)) * 280 + 10;
-                            var y = 100 - ((h - minH) / Math.max(maxH - minH, 1)) * 90;
-                            return x + ',' + y;
-                        });
-                        path.setAttribute('d', 'M' + pts.join(' L'));
-                        path.setAttribute('fill', 'none');
-                        path.setAttribute('stroke', '#00b9ff');
-                        path.setAttribute('stroke-width', '2');
-                        svg.appendChild(path);
-                        host.appendChild(svg);
-                        var cap = document.createElement('div');
-                        cap.style.marginTop = '6px';
-                        cap.textContent = 'min ' + minH.toFixed(1) + ' m — max ' + maxH.toFixed(1) + ' m';
-                        host.appendChild(cap);
-                    })
-                    .catch(function (err) {
-                        if (window.errorHandler) {
-                            window.errorHandler.handle(err, { component: 'ElevationProfile', action: 'sampleTerrain' }, false);
-                        } else {
-                            console.warn('Elevation profile terrain sampling failed:', err);
-                        }
-                        if (window.notification && typeof window.notification.error === 'function') {
-                            window.notification.error(
-                                window.appI18n && window.appI18n.nt
-                                    ? window.appI18n.nt('epTerrainFailed')
-                                    : 'Terrain sampling failed. Check terrain availability and try again.'
-                            );
-                        }
+                var pickedHeights = cartos.map(function (c) {
+                    return c && Number.isFinite(c.height) ? c.height : 0;
+                });
+
+                function renderElevationChart(rawHeights) {
+                    var heights = rawHeights.map(function (h, idx) {
+                        return Number.isFinite(h) ? h : pickedHeights[idx] || 0;
                     });
+                    var minH = Math.min.apply(null, heights);
+                    var maxH = Math.max.apply(null, heights);
+                    if (!Number.isFinite(minH)) minH = 0;
+                    if (!Number.isFinite(maxH)) maxH = minH;
+                    var span = Math.max(maxH - minH, 0.001);
+                    host.innerHTML = '';
+                    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    svg.setAttribute('width', '100%');
+                    svg.setAttribute('height', '120');
+                    svg.setAttribute('viewBox', '0 0 300 120');
+                    var pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    var pts = heights.map(function (h, i) {
+                        var x = (i / Math.max(heights.length - 1, 1)) * 280 + 10;
+                        var y = maxH === minH ? 60 : 100 - ((h - minH) / span) * 85;
+                        return x.toFixed(2) + ',' + y.toFixed(2);
+                    });
+                    pathEl.setAttribute('d', 'M' + pts.join(' L'));
+                    pathEl.setAttribute('fill', 'none');
+                    pathEl.setAttribute('stroke', '#00b9ff');
+                    pathEl.setAttribute('stroke-width', '2');
+                    svg.appendChild(pathEl);
+                    host.appendChild(svg);
+                    var cap = document.createElement('div');
+                    cap.style.marginTop = '6px';
+                    cap.textContent = 'min ' + minH.toFixed(1) + ' m — max ' + maxH.toFixed(1) + ' m';
+                    host.appendChild(cap);
+                }
+
+                var tp = viewer.terrainProvider;
+                var canSampleDetailed =
+                    Boolean(tp && tp.availability) && typeof Cesium.sampleTerrainMostDetailed === 'function';
+                if (canSampleDetailed) {
+                    var sampleCartos = cartos.map(function (c) {
+                        return Cesium.Cartographic.clone(c);
+                    });
+                    Cesium.sampleTerrainMostDetailed(tp, sampleCartos)
+                        .then(function (updated) {
+                            renderElevationChart(
+                                updated.map(function (c, idx) {
+                                    return c && Number.isFinite(c.height) ? c.height : pickedHeights[idx];
+                                })
+                            );
+                        })
+                        .catch(function () {
+                            // Fall back cleanly to picked 3D Tiles / surface elevations
+                            renderElevationChart(pickedHeights);
+                        });
+                } else {
+                    // Ellipsoid terrain or local 3D Tileset without quantized terrain: chart picked surface heights directly
+                    renderElevationChart(pickedHeights);
+                }
                 if (handler && !handler.isDestroyed()) handler.destroy();
                 handler = null;
             }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);

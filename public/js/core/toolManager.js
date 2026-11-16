@@ -76,8 +76,16 @@
                         self._deactivateExclusivePeers(name);
                     }
                     tool._active = on;
-                    if (on) activate.call(tool);
-                    else deactivate.call(tool);
+                    if (on) {
+                        try {
+                            activate.call(tool);
+                        } catch (err) {
+                            tool._active = false;
+                            throw err;
+                        }
+                    } else {
+                        deactivate.call(tool);
+                    }
                 },
                 enumerable: true,
                 configurable: true

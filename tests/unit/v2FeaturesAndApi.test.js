@@ -239,6 +239,23 @@ describe('SimplexDM v2.0.0 — REST GIS API, Sample 3D Tiles & Cesium Fallback',
         expect(missingAddon.status).toBe(200);
         expect(missingAddon.headers['x-simplex-optional-addon']).toBe('unavailable');
     });
+
+    test('returns clean empty meta.json for /data/tiles/meta.json and /data/pro/meta.json when unpacked', async () => {
+        for (const metaPath of ['/data/tiles/meta.json', '/data/pro/meta.json']) {
+            const diskFile = path.join(ROOT, metaPath.slice(1));
+            const res = await httpRequest(port, metaPath);
+            expect(res.status).toBe(200);
+            expect(String(res.headers['content-type'] || '')).toContain('application/json');
+            expect(res.json).not.toBeNull();
+            expect(Array.isArray(res.json.raster_zooms)).toBe(true);
+            expect(Array.isArray(res.json.vector_zooms)).toBe(true);
+            if (!fs.existsSync(diskFile)) {
+                expect(res.headers['x-simplex-offline-tiles']).toBe('empty');
+                expect(res.json.raster_zooms).toEqual([]);
+                expect(res.json.vector_zooms).toEqual([]);
+            }
+        }
+    });
 });
 
 describe('SimplexDM v2.0.0 — Geodesic Math, Solar Ephemeris, Security & Editors', () => {
@@ -463,5 +480,14 @@ describe('SimplexDM v2.0.0 — Geodesic Math, Solar Ephemeris, Security & Editor
             expect(txt).not.toContain('cdnjs.cloudflare.com');
             expect(txt).not.toMatch(/\balert\s*\(/);
         }
+
+        // Electron main process keeps hardened isolation + explicit CSP directives without dev CSP warning spam
+        const electronMain = fs.readFileSync(path.join(ROOT, 'electron-main.js'), 'utf8');
+        expect(electronMain).toContain('ELECTRON_DISABLE_SECURITY_WARNINGS');
+        expect(electronMain).toContain('contextIsolation: true');
+        expect(electronMain).toContain('nodeIntegration: false');
+        expect(electronMain).toContain('sandbox: true');
+        expect(electronMain).toContain("object-src 'none'");
+        expect(electronMain).toContain("'wasm-unsafe-eval'");
     });
 });
