@@ -110,8 +110,8 @@ export function emitLocales(options = {}) {
   const arContent = renderLocaleScript('window.__SIMPLEX_LOCALE_AR', built.ar);
 
   if (checkOnly) {
-    const curEn = fs.existsSync(enPath) ? fs.readFileSync(enPath, 'utf8') : '';
-    const curAr = fs.existsSync(arPath) ? fs.readFileSync(arPath, 'utf8') : '';
+    const curEn = fs.existsSync(enPath) ? fs.readFileSync(enPath, 'utf8').replace(/\r\n/g, '\n') : '';
+    const curAr = fs.existsSync(arPath) ? fs.readFileSync(arPath, 'utf8').replace(/\r\n/g, '\n') : '';
     if (curEn !== enContent || curAr !== arContent) {
       throw new Error('Emitted locale files are out of sync with scripts/locale-*-part*.mjs. Run `node scripts/emit-locale.mjs`.');
     }
