@@ -123,13 +123,17 @@ function getCorsHeaders(req) {
 function isPathWithinRoot(candidatePath, rootDir) {
     const resolvedCandidate = path.resolve(candidatePath);
     const resolvedRoot = path.resolve(rootDir);
+    if (process.platform === 'win32') {
+        const candLow = resolvedCandidate.toLowerCase();
+        const rootLow = resolvedRoot.toLowerCase();
+        if (candLow === rootLow) return true;
+        const prefixLow = rootLow.endsWith(path.sep) ? rootLow : rootLow + path.sep;
+        return candLow.startsWith(prefixLow);
+    }
     if (resolvedCandidate === resolvedRoot) {
         return true;
     }
     const prefix = resolvedRoot.endsWith(path.sep) ? resolvedRoot : resolvedRoot + path.sep;
-    if (process.platform === 'win32') {
-        return resolvedCandidate.toLowerCase().startsWith(prefix.toLowerCase());
-    }
     return resolvedCandidate.startsWith(prefix);
 }
 

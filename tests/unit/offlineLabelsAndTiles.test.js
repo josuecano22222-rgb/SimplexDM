@@ -4,7 +4,6 @@
  */
 'use strict';
 
-const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -20,6 +19,13 @@ const {
     decodeMvt,
     renderMvtToCanvas,
 } = require('../../public/js/gis/offlineVectorTileProvider');
+const {
+    findPython3,
+    runPythonScript,
+    buildWorldLabelsDb,
+    packRegionRlp,
+    updateTileMeta,
+} = require('../../scripts/offlineLabelTools');
 
 require('../../public/js/gis/labelCollisionEngine');
 require('../../public/js/gis/labelManager');
@@ -140,42 +146,31 @@ describe('Offline Label Databases, Python Packagers, Offline Tile Metadata & MVT
             })
         );
 
-        // 1. Build full SQLite label DB (zooms 0..18) via scripts/build_world_labels.py
+        // 1. Build full SQLite label DB (zooms 0..18) + coarse world DB (0..8) + .rlp pack.
+        // Uses Python CLI when a real Python 3.8+ runtime is installed (handles Windows `python`/`py -3`
+        // and skips the Microsoft Store alias stub), falling back seamlessly to our pure Node.js
+        // `scripts/offlineLabelTools.js` implementation when Python is not installed.
+        const python = findPython3();
         const masterSourceDb = path.join(tmpDir, 'master-source.db');
-        execFileSync(
-            'python3',
-            [
-                path.join(ROOT, 'scripts/build_world_labels.py'),
+        worldDbPath = path.join(userDataDir, 'label-data', 'labels-world-base.db');
+        rlpPath = path.join(tmpDir, 'nl-north-holland.rlp');
+
+        if (python) {
+            runPythonScript(python, path.join(ROOT, 'scripts/build_world_labels.py'), [
                 '--geojson', allPlacesGeoJson,
                 '--min-zoom', '0',
                 '--max-zoom', '18',
                 '--out', masterSourceDb,
                 '--quiet',
-            ],
-            { stdio: 'pipe' }
-        );
-
-        // Build coarse world base DB (zooms 0..8) in userData/label-data/
-        worldDbPath = path.join(userDataDir, 'label-data', 'labels-world-base.db');
-        execFileSync(
-            'python3',
-            [
-                path.join(ROOT, 'scripts/build_world_labels.py'),
+            ]);
+            runPythonScript(python, path.join(ROOT, 'scripts/build_world_labels.py'), [
                 '--geojson', allPlacesGeoJson,
                 '--min-zoom', '0',
                 '--max-zoom', '8',
                 '--out', worldDbPath,
                 '--quiet',
-            ],
-            { stdio: 'pipe' }
-        );
-
-        // 2. Cut a distributable .rlp region pack via scripts/pack_region.py
-        rlpPath = path.join(tmpDir, 'nl-north-holland.rlp');
-        execFileSync(
-            'python3',
-            [
-                path.join(ROOT, 'scripts/pack_region.py'),
+            ]);
+            runPythonScript(python, path.join(ROOT, 'scripts/pack_region.py'), [
                 '--db', masterSourceDb,
                 '--id', 'nl-north-holland',
                 '--name', 'North Holland',
@@ -187,9 +182,23 @@ describe('Offline Label Databases, Python Packagers, Offline Tile Metadata & MVT
                 '--max-zoom', '18',
                 '--out', rlpPath,
                 '--quiet',
-            ],
-            { stdio: 'pipe' }
-        );
+            ]);
+        } else {
+            buildWorldLabelsDb({ geojsonPath: allPlacesGeoJson, outPath: masterSourceDb, minZoom: 0, maxZoom: 18 });
+            buildWorldLabelsDb({ geojsonPath: allPlacesGeoJson, outPath: worldDbPath, minZoom: 0, maxZoom: 8 });
+            packRegionRlp({
+                sourceDbPath: masterSourceDb,
+                outPath: rlpPath,
+                id: 'nl-north-holland',
+                name: 'North Holland',
+                west: 4.5,
+                south: 52.1,
+                east: 5.2,
+                north: 52.6,
+                minZoom: 8,
+                maxZoom: 18,
+            });
+        }
     });
 
     afterAll(() => {
@@ -286,13 +295,22 @@ describe('Offline Label Databases, Python Packagers, Offline Tile Metadata & MVT
         fs.writeFileSync(path.join(tilesDir, 'raster', '2', '1', '1.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
         fs.writeFileSync(path.join(tilesDir, 'vector', '4', '8', '5.pbf'), Buffer.from(encodeTestMvt()));
 
-        execFileSync('python3', [path.join(ROOT, 'data/update_meta.py'), '--dir', tilesDir, '--quiet'], {
-            stdio: 'pipe',
-        });
+        const python = findPython3();
+        if (python) {
+            runPythonScript(python, path.join(ROOT, 'data/update_meta.py'), ['--dir', tilesDir, '--quiet']);
+            const pyMeta = JSON.parse(fs.readFileSync(path.join(tilesDir, 'meta.json'), 'utf8'));
+            expect(pyMeta.raster_zooms).toEqual([0, 2]);
+            expect(pyMeta.vector_zooms).toEqual([4]);
+            fs.unlinkSync(path.join(tilesDir, 'meta.json'));
+        }
 
+        // Also verify pure Node.js cross-platform `updateTileMeta` (works without Python on Windows)
+        updateTileMeta({ dir: tilesDir });
         const meta = JSON.parse(fs.readFileSync(path.join(tilesDir, 'meta.json'), 'utf8'));
         expect(meta.raster_zooms).toEqual([0, 2]);
         expect(meta.vector_zooms).toEqual([4]);
+        expect(meta.raster.tile_count).toBe(2);
+        expect(meta.vector.tile_count).toBe(1);
     });
 
     test('OfflineVectorTileImageryProvider decodes binary MVT v2 protobuf tiles and renders canvas', () => {

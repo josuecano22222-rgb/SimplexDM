@@ -210,18 +210,34 @@ describe('SimplexDM v2.0.0 — REST GIS API, Sample 3D Tiles & Cesium Fallback',
         }
     });
 
-    test('serves CesiumJS via node_modules fallback and returns clean stub for optional Ion SDK', async () => {
+    test('serves CesiumJS via node_modules fallback and handles both installed and missing Ion SDK addons', async () => {
         const cesiumHead = await httpRequest(port, '/lib/cesium/Widgets/widgets.css', {
             method: 'HEAD',
         });
         expect(cesiumHead.status).toBe(200);
 
-        const ionStub = await httpRequest(
+        // When commercial Ion SDK Measurements is installed locally in public/lib/cesium/packages/,
+        // server returns the real JS asset (200 OK, no stub header); otherwise returns clean 200 stub.
+        const ionRelPath = 'lib/cesium/packages/ion-sdk-measurements/Build/IonSdkMeasurements/IonSdkMeasurements.js';
+        const ionInstalled =
+            fs.existsSync(path.join(ROOT, 'public', ionRelPath)) ||
+            fs.existsSync(path.join(ROOT, 'public-bundled', ionRelPath));
+        const ionRes = await httpRequest(port, '/' + ionRelPath);
+        expect(ionRes.status).toBe(200);
+        expect(String(ionRes.headers['content-type'] || '')).toContain('javascript');
+        if (ionInstalled) {
+            expect(ionRes.headers['x-simplex-optional-addon']).toBeUndefined();
+        } else {
+            expect(ionRes.headers['x-simplex-optional-addon']).toBe('unavailable');
+        }
+
+        // Guaranteed-uninstalled optional Ion SDK addon always returns clean 200 stub (zero 404 console noise)
+        const missingAddon = await httpRequest(
             port,
-            '/lib/cesium/packages/ion-sdk-measurements/Build/IonSdkMeasurements/IonSdkMeasurements.js'
+            '/lib/cesium/packages/ion-sdk-uninstalled-probe/Build/Probe.js'
         );
-        expect(ionStub.status).toBe(200);
-        expect(ionStub.headers['x-simplex-optional-addon']).toBe('unavailable');
+        expect(missingAddon.status).toBe(200);
+        expect(missingAddon.headers['x-simplex-optional-addon']).toBe('unavailable');
     });
 });
 

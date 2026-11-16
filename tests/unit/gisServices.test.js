@@ -5,7 +5,6 @@
  */
 'use strict';
 
-const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -22,6 +21,7 @@ const { resolveWorkerScript } = require('../../main/gis/services/GeoprocessingSe
 const { executeGeometryOperation, loadJsts } = require('../../main/gis/workers/geoprocess.worker');
 const { ProjectService } = require('../../main/gis/services/ProjectService');
 const { OfflineService } = require('../../main/gis/services/OfflineService');
+const { writeZipArchive } = require('../../scripts/offlineLabelTools');
 
 describe('Desktop GIS Services (SQLite R*Tree, CRS, GeoPackage, I/O, Geoprocessing, Project, Offline)', () => {
     let tmpDir;
@@ -117,20 +117,70 @@ describe('Desktop GIS Services (SQLite R*Tree, CRS, GeoPackage, I/O, Geoprocessi
         expect(lookupUtm.some((r) => r.code === 'EPSG:32636')).toBe(true);
     });
 
-    test('GeoPackageService blocks SQL injection on queryFeatures where clauses', async () => {
-        // Verify SQL-injection validator guards unsafe clauses before execution
+    test('GeoPackageService executes full .gpkg lifecycle on disk and blocks SQL injection', async () => {
+        // Verify SQL-injection validator guards unsafe clauses before opening database
         await expect(
             gpkg.queryFeatures(path.join(tmpDir, 'nonexistent.gpkg'), {
                 layerId: 'parcels',
                 where: '1=1; DROP TABLE parcels;--',
             })
-        ).rejects.toThrow();
+        ).rejects.toThrow(/Unsafe SQL/i);
         await expect(
             gpkg.queryFeatures(path.join(tmpDir, 'nonexistent.gpkg'), {
                 layerId: 'parcels',
                 where: 'id = 1 UNION SELECT 1,2,3',
             })
-        ).rejects.toThrow();
+        ).rejects.toThrow(/Unsafe SQL/i);
+
+        // Full OGC GeoPackage round-trip on disk (works via native better-sqlite3 OR rtree-sql.js WASM)
+        expect(['better-sqlite3', 'rtree-sql.js']).toContain(gpkg.adapterName);
+        const gpkgPath = path.join(tmpDir, 'workspace-roundtrip.gpkg');
+        await gpkg.ensureProjectGeoPackage(gpkgPath, {
+            name: 'Meridian Field Survey',
+            description: 'Cross-platform GeoPackage check',
+            displayCrs: 'EPSG:4326',
+        });
+        expect(fs.existsSync(gpkgPath)).toBe(true);
+
+        await gpkg.createVectorLayer(gpkgPath, {
+            id: 'sensors',
+            name: 'Sensors',
+            geometryType: 'POINT',
+            crs: 'EPSG:4326',
+            fields: [
+                { name: 'label', type: 'TEXT' },
+                { name: 'elevation_m', type: 'REAL' },
+            ],
+        });
+
+        const ins1 = await gpkg.insertFeature(gpkgPath, 'sensors', {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [4.9041, 52.3676] },
+            properties: { label: 'Dam Square', elevation_m: 3.5 },
+        });
+        const ins2 = await gpkg.insertFeature(gpkgPath, 'sensors', {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [4.9003, 52.3791] },
+            properties: { label: 'Centraal', elevation_m: 5.2 },
+        });
+        expect(ins1.id).toBeGreaterThan(0);
+        expect(ins2.id).toBeGreaterThan(0);
+
+        const layers = await gpkg.listLayers(gpkgPath);
+        expect(layers.vectors.map((l) => l.id)).toContain('sensors');
+
+        const queried = await gpkg.queryFeatures(gpkgPath, { layerId: 'sensors' });
+        expect(queried.features).toHaveLength(2);
+        expect(queried.features.map((f) => f.properties.label).sort()).toEqual(['Centraal', 'Dam Square']);
+
+        await gpkg.deleteFeature(gpkgPath, 'sensors', ins1.id);
+        const afterFeatureDel = await gpkg.queryFeatures(gpkgPath, { layerId: 'sensors' });
+        expect(afterFeatureDel.features).toHaveLength(1);
+
+        const delLayer = await gpkg.deleteLayer(gpkgPath, 'sensors');
+        expect(delLayer.ok).toBe(true);
+        const afterLayerDel = await gpkg.listLayers(gpkgPath);
+        expect(afterLayerDel.vectors).toHaveLength(0);
     });
 
     test('ImportExportService converts CSV, KML, KMZ, and GeoJSON losslessly with XML escaping', async () => {
@@ -144,23 +194,12 @@ describe('Desktop GIS Services (SQLite R*Tree, CRS, GeoPackage, I/O, Geoprocessi
         expect(csvFc.features[0].geometry.coordinates[1]).toBeCloseTo(52.37, 5);
         expect(csvFc.features[0].properties.notes).toBe('Main, North');
 
-        // Export to KML, bundle into a real .kmz ZIP archive, and extract back
+        // Export to KML, bundle into a real .kmz ZIP archive (pure Node.js, no Python needed), and extract back
         const kmlStr = featureCollectionToKml(csvFc, 'SensorNetwork');
         expect(kmlStr).toContain('<Placemark>');
         expect(kmlStr).toContain('Sensor 1');
-        const kmlPath = path.join(tmpDir, 'doc.kml');
         const kmzPath = path.join(tmpDir, 'sensors.kmz');
-        fs.writeFileSync(kmlPath, kmlStr, 'utf8');
-        execFileSync(
-            'python3',
-            [
-                '-c',
-                'import sys, zipfile\nwith zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:\n    z.write(sys.argv[2], "doc.kml")',
-                kmzPath,
-                kmlPath,
-            ],
-            { stdio: 'pipe' }
-        );
+        writeZipArchive(kmzPath, [{ name: 'doc.kml', data: Buffer.from(kmlStr, 'utf8') }]);
         const extractedKml = await io._extractKmlFromKmz(kmzPath);
         expect(extractedKml).toContain('SensorNetwork');
         expect(extractedKml).toContain('4.9,52.37');
