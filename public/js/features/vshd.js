@@ -5,9 +5,13 @@
 (function () {
     'use strict';
 
-    const RS =
-        (typeof window !== 'undefined' && window.IonSdkSensors && window.IonSdkSensors.RectangularSensor) ||
-        (typeof IonSdkSensors !== 'undefined' && IonSdkSensors.RectangularSensor);
+    function getRectangularSensor() {
+        return (
+            (typeof window !== 'undefined' && window.IonSdkSensors && window.IonSdkSensors.RectangularSensor) ||
+            (typeof IonSdkSensors !== 'undefined' && IonSdkSensors.RectangularSensor) ||
+            null
+        );
+    }
 
     const OBSERVER_ENTITY_ID = 'simplex_viewshed_observer';
 
@@ -146,6 +150,7 @@
         },
 
         CreateRectangularSensor(p) {
+            const RS = getRectangularSensor();
             if (!RS || !this._viewer) return;
             this.Delete();
             const xFull = Math.max(0.5, Math.min(179.9, p.xangle != null ? p.xangle : p.fovx != null ? p.fovx : 90));
@@ -216,6 +221,7 @@
         },
 
         UpdateSensor(p) {
+            const RS = getRectangularSensor();
             if (!this._primitive || !RS || !p) return;
             const xFull = Math.max(0.5, Math.min(179.9, p.xangle != null ? p.xangle : p.fovx != null ? p.fovx : 90));
             const yFull = Math.max(0.5, Math.min(179.9, p.yangle != null ? p.yangle : p.fovy != null ? p.fovy : 60));

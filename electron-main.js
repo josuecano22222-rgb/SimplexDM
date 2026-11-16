@@ -12,6 +12,14 @@
  * @requires http
  */
 
+// CesiumJS 1.137 (Emscripten Draco/KTX2 WebAssembly bindings + bundled Knockout 3.5)
+// and optional Cesium Ion SDK widgets legitimately require `'unsafe-eval'` in script-src.
+// All Electron isolation boundaries (contextIsolation, sandbox, nodeIntegration: false,
+// strict CSP header, outbound host allowlist, and permission denial) remain enforced.
+if (!('ELECTRON_DISABLE_SECURITY_WARNINGS' in process.env)) {
+    process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
+}
+
 const { app, BrowserWindow, ipcMain, session, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -190,6 +198,7 @@ function createWindow() {
             preload: path.join(getAppPath(), 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
+            sandbox: true,
             enableWebSQL: false,
             webSecurity: true,
             allowRunningInsecureContent: false,
@@ -376,8 +385,8 @@ app.whenReady().then(async () => {
                 ? "style-src 'self' 'unsafe-inline' https://cesium.com;"
                 : "style-src 'self' 'unsafe-inline';";
             const cspScript = simModeEnabled
-                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cesium.com blob:;"
-                : "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:;";
+                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cesium.com blob:;"
+                : "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob:;";
             const cspImage = simModeEnabled
                 ? `img-src 'self' http://localhost:* http://127.0.0.1:* https://cesium.com${osmCsp} data: blob:;`
                 : `img-src 'self' http://localhost:* http://127.0.0.1:*${osmCsp} data: blob:;`;
@@ -386,6 +395,9 @@ app.whenReady().then(async () => {
                     ...details.responseHeaders,
                     'Content-Security-Policy': [
                         "default-src 'self' http://localhost:* http://127.0.0.1:* data: blob:; " +
+                            "object-src 'none'; " +
+                            "base-uri 'self'; " +
+                            "frame-ancestors 'self'; " +
                             `${cspScript} ` +
                             "worker-src 'self' blob:; " +
                             `${cspStyle} ` +

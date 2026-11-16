@@ -803,6 +803,26 @@ function createRequestHandler(options = {}) {
                 }
             }
 
+            // Optional offline basemap metadata: when no offline tiles have been packed yet,
+            // return a clean empty manifest instead of a 404 console error on startup.
+            if (lowerRel === 'data/tiles/meta.json' || lowerRel === 'data/pro/meta.json') {
+                const emptyMeta = JSON.stringify({
+                    schema_version: 1,
+                    raster_zooms: [],
+                    vector_zooms: [],
+                    raster: { zooms: [], tile_count: 0, total_bytes: 0, formats: [], bbox: null },
+                    vector: { zooms: [], tile_count: 0, total_bytes: 0, formats: [], bbox: null },
+                });
+                res.writeHead(200, {
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'Cache-Control': 'no-cache',
+                    'X-Simplex-Offline-Tiles': 'empty',
+                    ...cors,
+                });
+                res.end(req.method === 'HEAD' ? undefined : emptyMeta);
+                return;
+            }
+
             // Fallback lookup inside active tileset directories for relative sibling tile requests
             for (const tilesetDir of tilesetDirs) {
                 const candidate = path.join(tilesetDir, relUrlPath);
