@@ -8,9 +8,16 @@
   },
   "features": {
     "measurement": { "enabled": true },
-    "navigation": { "enabled": true }
+    "navigation": { "enabled": true },
+    "layers": { "enabled": true },
+    "collaboration": { "enabled": true },
+    "labels": { "enabled": true }
   },
   "performance": {
+    "tileCacheSize": 500,
+    "maxConcurrentRequests": 6,
+    "enableHorizonCulling": true,
+    "enableFrustumCulling": true,
     "renderLoopFrameBudgetMs": 8,
     "idleCallbackTimeoutMs": 2000,
     "deferredInitYieldMs": 10

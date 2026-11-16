@@ -720,19 +720,11 @@
         _syncToolCatalogAndModules(base, jcm) {
             const map = window.controlCenterRegistry && window.controlCenterRegistry.TOOL_ACTION_TO_MODULE;
             if (!map || !base.tools || !Array.isArray(base.tools.items) || !base.modules) return;
+            // Module enablement state is authoritative: sync catalog tool items both when disabling AND re-enabling
             base.tools.items.forEach((it) => {
                 const mk = map[it.action];
                 if (!mk || !base.modules[mk]) return;
-                if (base.modules[mk].enabled === false) {
-                    it.enabled = false;
-                }
-            });
-            base.tools.items.forEach((it) => {
-                const mk = map[it.action];
-                if (!mk || !base.modules[mk]) return;
-                if (it.enabled === false) {
-                    base.modules[mk] = { ...base.modules[mk], enabled: false };
-                }
+                it.enabled = base.modules[mk].enabled !== false;
             });
         }
 

@@ -98,17 +98,25 @@ class NavigationManager {
      * Restore camera position
      */
     restoreCameraPosition(position) {
-        if (!this.tilesetViewer || !this.tilesetViewer.viewer) return;
+        if (!this.tilesetViewer || !this.tilesetViewer.viewer || !position) return;
 
         const camera = this.tilesetViewer.viewer.camera;
-        camera.setView({
-            destination: position.position,
-            orientation: {
-                heading: position.heading,
-                pitch: position.pitch,
-                roll: position.roll
-            }
-        });
+        this._isRestoringHistory = true;
+        try {
+            camera.setView({
+                destination: position.position,
+                orientation: {
+                    heading: position.heading,
+                    pitch: position.pitch,
+                    roll: position.roll
+                }
+            });
+            this.tilesetViewer.viewer.scene?.requestRender?.();
+        } finally {
+            setTimeout(() => {
+                this._isRestoringHistory = false;
+            }, 80);
+        }
     }
 
     /**
@@ -316,9 +324,339 @@ class NavigationManager {
         }
     }
 
-    /** Call after DOM is ready so default active state matches explore mode */
+    /** Call after DOM/viewer is ready so default active state, camera history, shortcuts, and drag-and-drop are active */
     initBrowseToolbar() {
+        this.tilesetViewer = this.tilesetViewer || window.tilesetViewer;
         this._syncBrowseUi();
+        this.bindCameraHistory();
+        this.bindGlobalShortcuts();
+        this.bindViewportDragAndDrop();
+    }
+
+    /**
+     * Record camera positions automatically on `viewer.camera.moveEnd` when `autoSave` is enabled.
+     */
+    bindCameraHistory() {
+        if (this._historyBound) return;
+        const viewer = (this.tilesetViewer || window.tilesetViewer)?.viewer;
+        if (!viewer?.camera?.moveEnd) return;
+        this._historyBound = true;
+        this.tilesetViewer = window.tilesetViewer;
+
+        // Capture initial state
+        if (this.autoSave && this.history.length === 0) {
+            this.saveCameraPosition();
+        }
+
+        this._moveEndListener = () => {
+            if (!this.autoSave || this._isRestoringHistory) return;
+            const prev = this.history[this.historyIndex];
+            if (prev && typeof Cesium !== 'undefined' && Cesium.Cartesian3?.distance) {
+                const dist = Cesium.Cartesian3.distance(prev.position, viewer.camera.position);
+                const dHead = Math.abs((prev.heading || 0) - (viewer.camera.heading || 0));
+                const dPitch = Math.abs((prev.pitch || 0) - (viewer.camera.pitch || 0));
+                if (dist < 0.5 && dHead < 0.005 && dPitch < 0.005) return;
+            }
+            this.saveCameraPosition();
+        };
+        viewer.camera.moveEnd.addEventListener(this._moveEndListener);
+    }
+
+    /**
+     * Check whether keyboard focus is inside an editable form control or modal input.
+     */
+    static isEditableTarget(el) {
+        if (!el) return false;
+        const tag = (el.tagName || '').toUpperCase();
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON') return true;
+        if (el.isContentEditable) return true;
+        return Boolean(el.closest && el.closest('[contenteditable="true"]'));
+    }
+
+    /**
+     * Bind standard 3D camera keyboard controls (`W/A/S/D`, `Q/E`, `R`, `F`, `Space`, `Escape`).
+     */
+    bindGlobalShortcuts() {
+        if (this._shortcutsBound || typeof window === 'undefined') return;
+        this._shortcutsBound = true;
+
+        this._keydownHandler = (e) => {
+            if (e.defaultPrevented) return;
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (NavigationManager.isEditableTarget(e.target) || NavigationManager.isEditableTarget(document.activeElement)) {
+                return;
+            }
+
+            // Universal Ctrl/Cmd+K focuses geographic search
+            if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') {
+                e.preventDefault();
+                window.searchManager?.show?.();
+                return;
+            }
+
+            // `?` toggles Navigation Help overlay
+            if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                e.preventDefault();
+                window.navigationHelpUI?.toggle?.();
+                return;
+            }
+
+            // Camera history undo/redo: Alt+ArrowLeft / Alt+ArrowRight or [ / ]
+            if (
+                (e.altKey && e.code === 'ArrowLeft') ||
+                (!e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'BracketLeft')
+            ) {
+                e.preventDefault();
+                window.cameraHistory?.undo?.();
+                return;
+            }
+            if (
+                (e.altKey && e.code === 'ArrowRight') ||
+                (!e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'BracketRight')
+            ) {
+                e.preventDefault();
+                window.cameraHistory?.redo?.();
+                return;
+            }
+
+            // Escape cancels active tool/measurement/cut/flight/street-view/orbit anywhere on the map
+            if (e.code === 'Escape' || e.key === 'Escape') {
+                if (window.streetViewManager?.isActive) {
+                    window.streetViewManager.exitStreetView();
+                    return;
+                }
+                if (window.supermanFlightModeManager?.isActive) {
+                    window.supermanFlightModeManager.stop?.();
+                    return;
+                }
+                if (window.flightModeManager?.isActive || window.flightModeManager?.isFlying) {
+                    window.flightModeManager.stopFlight?.();
+                    window.flightModeManager.hide?.();
+                    return;
+                }
+                if (window.coordinateManager?.isFlyAroundActive) {
+                    window.coordinateManager.stopFlyAround?.();
+                    return;
+                }
+                window.enhancedMeasurementManager?.stopMeasurement?.();
+                window.cutByPolygonManager?.cancelCutting?.();
+                window.lineOfSightManager?.stopPicking?.();
+                window.editingManager?.setTool?.('select');
+                window.app?.clearToolStatus?.();
+                return;
+            }
+
+            // Defer WASD/QE while Street View or Flight / Superman Flight Mode owns keyboard movement
+            const activeFlight =
+                window.supermanFlightModeManager?.isActive ||
+                window.flightModeManager?.isFlying ||
+                window.flightModeManager?.isActive;
+            if (window.streetViewManager?.isActive || activeFlight) {
+                if (e.code === 'Space' && activeFlight) {
+                    e.preventDefault();
+                    if (window.supermanFlightModeManager?.isActive) {
+                        window.supermanFlightModeManager.stop?.();
+                    } else if (typeof window.flightModeManager?.stopFlight === 'function') {
+                        window.flightModeManager.stopFlight();
+                    } else if (typeof window.flightModeManager?.hide === 'function') {
+                        window.flightModeManager.hide();
+                    }
+                }
+                return;
+            }
+
+            const viewer = (this.tilesetViewer || window.tilesetViewer)?.viewer;
+            if (!viewer?.camera) return;
+
+            const carto = viewer.camera.positionCartographic;
+            const altitude = Math.max(10, Number(carto?.height) || 500);
+            const moveStep = Math.max(2, Math.min(250000, altitude * 0.06));
+            const rotateStep = 0.05; // ~2.9 degrees per press
+
+            switch (e.code) {
+                case 'KeyW':
+                    e.preventDefault();
+                    viewer.camera.moveForward(moveStep);
+                    viewer.scene?.requestRender?.();
+                    break;
+                case 'KeyS':
+                    e.preventDefault();
+                    viewer.camera.moveBackward(moveStep);
+                    viewer.scene?.requestRender?.();
+                    break;
+                case 'KeyA':
+                    e.preventDefault();
+                    viewer.camera.moveLeft(moveStep);
+                    viewer.scene?.requestRender?.();
+                    break;
+                case 'KeyD':
+                    e.preventDefault();
+                    viewer.camera.moveRight(moveStep);
+                    viewer.scene?.requestRender?.();
+                    break;
+                case 'KeyQ':
+                    e.preventDefault();
+                    viewer.camera.lookLeft(rotateStep);
+                    viewer.scene?.requestRender?.();
+                    break;
+                case 'KeyE':
+                    e.preventDefault();
+                    viewer.camera.lookRight(rotateStep);
+                    viewer.scene?.requestRender?.();
+                    break;
+                case 'KeyR':
+                    e.preventDefault();
+                    this.home();
+                    break;
+                case 'KeyF': {
+                    e.preventDefault();
+                    const all = (this.tilesetViewer || window.tilesetViewer)?.getAllTilesets?.() || [];
+                    if (all.length > 0) {
+                        (this.tilesetViewer || window.tilesetViewer).fitToView(all[0].id);
+                    } else {
+                        this.home();
+                    }
+                    break;
+                }
+                case 'Space': {
+                    // Play/pause active shade animation, orbit fly-around, flight mode, or toggle fly-around
+                    e.preventDefault();
+                    if (window.shadeAnalysisManager?.isActive) {
+                        if (window.shadeAnalysisManager.isAnimating) {
+                            window.shadeAnalysisManager.pauseAnimation();
+                        } else {
+                            window.shadeAnalysisManager.playAnimation();
+                        }
+                    } else if (window.supermanFlightModeManager?.toggle) {
+                        window.supermanFlightModeManager.toggle();
+                    } else if (window.flightModeManager?.toggle) {
+                        window.flightModeManager.toggle();
+                    } else if (window.coordinateManager?.toggleFlyAround) {
+                        window.coordinateManager.toggleFlyAround();
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', this._keydownHandler);
+    }
+
+    /**
+     * Allow dragging & dropping 3D tilesets (`tileset.json`), 3D models (`.glb`/`.gltf`),
+     * GIS vector/raster layers (`.geojson`, `.kml`, `.kmz`, `.czml`, `.csv`, `.gpkg`, `.shp`, `.tif`),
+     * and offline label region packs (`.rlp`) directly onto the 3D viewport.
+     */
+    bindViewportDragAndDrop() {
+        if (this._dndBound || typeof document === 'undefined') return;
+        const target = document.getElementById('cesiumContainer') || document.body;
+        if (!target) return;
+        this._dndBound = true;
+
+        target.addEventListener('dragover', (e) => {
+            if (!e.dataTransfer?.types?.includes?.('Files')) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+
+        target.addEventListener('drop', async (e) => {
+            const files = Array.from(e.dataTransfer?.files || []);
+            if (files.length === 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            for (const file of files) {
+                await this.handleDroppedFile(file);
+            }
+        });
+    }
+
+    async handleDroppedFile(file) {
+        if (!file) return false;
+        const name = String(file.name || '').toLowerCase();
+        const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : '';
+        const nativePath =
+            (window.electronAPI && typeof window.electronAPI.getPathForFile === 'function'
+                ? window.electronAPI.getPathForFile(file)
+                : '') ||
+            file.path ||
+            '';
+
+        try {
+            // 1. Offline label region pack (.rlp)
+            if (ext === '.rlp') {
+                if (nativePath && window.labelManagerUI?.importRegionFile) {
+                    await window.labelManagerUI.importRegionFile(nativePath);
+                    window.notification?.success?.(`Imported label pack: ${file.name}`);
+                    return true;
+                }
+                if (nativePath && window.electronAPI?.gis?.labels?.importRegion) {
+                    await window.electronAPI.gis.labels.importRegion(nativePath);
+                    window.labelManager?.refresh?.();
+                    window.notification?.success?.(`Imported label pack: ${file.name}`);
+                    return true;
+                }
+            }
+
+            // 2. 3D Tileset JSON vs GeoJSON
+            if (ext === '.json') {
+                const text = await file.text();
+                const parsed = JSON.parse(text);
+                if (parsed && (parsed.asset || parsed.root)) {
+                    if (nativePath && window.displayControl?.loadTileset) {
+                        await window.displayControl.loadTileset(nativePath, { fitToView: true });
+                        window.notification?.success?.(`Loaded tileset: ${file.name}`);
+                        return true;
+                    }
+                    if (window.modelAndLayerUploadManager?.loadLayerFile) {
+                        await window.modelAndLayerUploadManager.loadLayerFile(file);
+                        return true;
+                    }
+                } else if (parsed && (parsed.type === 'FeatureCollection' || parsed.type === 'Feature')) {
+                    if (window.modelAndLayerUploadManager?.loadLayerFile) {
+                        await window.modelAndLayerUploadManager.loadLayerFile(file);
+                        return true;
+                    }
+                }
+            }
+
+            // 3. 3D models (.glb / .gltf)
+            if (ext === '.glb' || ext === '.gltf') {
+                if (window.modelAndLayerUploadManager?.loadModelFile) {
+                    await window.modelAndLayerUploadManager.loadModelFile(file);
+                    return true;
+                }
+            }
+
+            // 4. Vector / tabular GIS layers (.geojson, .kml, .kmz, .czml, .csv)
+            if (['.geojson', '.kml', '.kmz', '.czml', '.csv'].includes(ext)) {
+                if (window.modelAndLayerUploadManager?.loadLayerFile) {
+                    await window.modelAndLayerUploadManager.loadLayerFile(file);
+                    return true;
+                }
+            }
+
+            // 5. Desktop GIS files (.gpkg, .shp, .zip, .tif, .tiff)
+            if (['.gpkg', '.shp', '.zip', '.tif', '.tiff'].includes(ext) && nativePath && window.electronAPI?.gis) {
+                if (ext === '.tif' || ext === '.tiff') {
+                    const meta = await window.electronAPI.gis.raster?.open?.(nativePath);
+                    window.notification?.success?.(`Opened raster: ${file.name} (${meta?.width || '?'}×${meta?.height || '?'})`);
+                    return true;
+                }
+                const proj = window.gisProjectManager?.currentProjectPath;
+                if (proj && window.electronAPI.gis.io?.importFile) {
+                    await window.electronAPI.gis.io.importFile(proj, { filePath: nativePath });
+                    window.notification?.success?.(`Imported layer: ${file.name}`);
+                    return true;
+                }
+            }
+        } catch (err) {
+            console.error('Drop import failed:', err);
+            window.notification?.error?.(`Failed to load ${file.name}: ${err.message}`);
+        }
+        return false;
     }
 }
 

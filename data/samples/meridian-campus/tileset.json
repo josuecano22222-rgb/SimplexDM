@@ -1,0 +1,142 @@
+{
+  "asset": {
+    "version": "1.0",
+    "tilesetVersion": "2.0.0",
+    "gltfUpAxis": "Y",
+    "extras": {
+      "title": "Meridian Survey Campus — Amsterdam 3D Reality Sample",
+      "location": "Amsterdam, NL (52.3676°N, 4.9041°E)",
+      "crs": "EPSG:4978 / WGS84",
+      "formats": [
+        "b3dm",
+        "i3dm",
+        "pnts",
+        "cmpt"
+      ],
+      "totalBuildings": 9,
+      "lidarPoints": 320,
+      "surveyAccuracyCm": 3
+    }
+  },
+  "properties": {
+    "height_m": {
+      "minimum": 14,
+      "maximum": 62.5
+    },
+    "floors": {
+      "minimum": 3,
+      "maximum": 16
+    },
+    "year_built": {
+      "minimum": 2019,
+      "maximum": 2026
+    },
+    "footprint_m2": {
+      "minimum": 256,
+      "maximum": 912
+    }
+  },
+  "geometricError": 240,
+  "root": {
+    "boundingVolume": {
+      "region": [
+        0.08557,
+        0.91396784,
+        0.08561538,
+        0.91400624,
+        0,
+        70
+      ]
+    },
+    "geometricError": 96,
+    "refine": "ADD",
+    "children": [
+      {
+        "boundingVolume": {
+          "region": [
+            0.08557349,
+            0.91398879,
+            0.08561189,
+            0.91400449,
+            0,
+            68
+          ]
+        },
+        "geometricError": 32,
+        "refine": "ADD",
+        "content": {
+          "uri": "north_sector_2025_06_15.json"
+        }
+      },
+      {
+        "boundingVolume": {
+          "region": [
+            0.08557349,
+            0.91396959,
+            0.08561189,
+            0.9139853,
+            0,
+            54
+          ]
+        },
+        "geometricError": 32,
+        "refine": "ADD",
+        "content": {
+          "uri": "south_sector_2026_09_20.json"
+        }
+      },
+      {
+        "transform": [
+          -0.085488,
+          0.996339,
+          0,
+          0,
+          -0.789045,
+          -0.067702,
+          0.610593,
+          0,
+          0.608358,
+          0.052199,
+          0.791944,
+          0,
+          3888360.886994,
+          333630.410966,
+          5027882.274791,
+          1
+        ],
+        "boundingVolume": {
+          "region": [
+            0.08558222,
+            0.91398006,
+            0.08560316,
+            0.91399402,
+            0,
+            22
+          ]
+        },
+        "geometricError": 8,
+        "refine": "ADD",
+        "content": {
+          "uri": "campus_lidar.pnts"
+        }
+      },
+      {
+        "boundingVolume": {
+          "region": [
+            0.08558222,
+            0.91398006,
+            0.08560316,
+            0.91399402,
+            0,
+            24
+          ]
+        },
+        "geometricError": 4,
+        "refine": "ADD",
+        "content": {
+          "uri": "campus_composite.cmpt"
+        }
+      }
+    ]
+  }
+}

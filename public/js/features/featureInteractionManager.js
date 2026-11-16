@@ -759,16 +759,25 @@ class FeatureInteractionManager {
 
     showMeasurementProperties() {
         if (!this.selectedMeasurement) return;
-        
-        // Show measurement details
+
+        const pts = Array.isArray(this.selectedMeasurement.points) ? this.selectedMeasurement.points : [];
         const details = {
-            type: this.selectedMeasurement.type,
-            result: this.selectedMeasurement.result,
-            points: this.selectedMeasurement.points.length
+            type: this.selectedMeasurement.type || 'measurement',
+            result: this.selectedMeasurement.result || '—',
+            vertices: pts.length,
         };
-        
-        alert(`Measurement Details:\nType: ${details.type}\nResult: ${details.result}\nPoints: ${details.points}`);
-        
+
+        if (window.metadataManager?.displayFeatureMetadata) {
+            window.metadataManager.displayFeatureMetadata(
+                details,
+                this.selectedMeasurement,
+                'Measurement Details'
+            );
+        }
+        window.notification?.info?.(
+            `${details.type}: ${details.result} (${details.vertices} points)`
+        );
+
         this.hideActionPanel();
     }
 

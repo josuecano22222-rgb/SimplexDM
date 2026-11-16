@@ -961,12 +961,18 @@ class DashboardUI {
                 return;
             }
 
-            const response = await fetch(resolvedUrl);
-            if (!response.ok) {
-                container.innerHTML = `<p class="dashboard-status dashboard-status--error"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>${this._t('dash.failedLoadJson')}${response.status}</span></p>`;
-                return;
+            let tilesetJson;
+            if (resolvedUrl && typeof resolvedUrl === 'object' && resolvedUrl.type === 'fileHandle' && resolvedUrl.handle) {
+                const fileObj = await resolvedUrl.handle.getFile();
+                tilesetJson = JSON.parse(await fileObj.text());
+            } else {
+                const response = await fetch(resolvedUrl);
+                if (!response.ok) {
+                    container.innerHTML = `<p class="dashboard-status dashboard-status--error"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>${this._t('dash.failedLoadJson')}${response.status}</span></p>`;
+                    return;
+                }
+                tilesetJson = await response.json();
             }
-            const tilesetJson = await response.json();
             // Get last two leaf tiles - use processLastTilesWithHighAccuracy if available
             let lastTwo = [];
             if (window.tilesetProcessor) {
@@ -1060,6 +1066,28 @@ class DashboardUI {
         // Switch to paths tab
         if (window.app) {
             window.app.switchDashboardTab('paths');
+        }
+    }
+
+    show(tabName = null) {
+        if (window.app && typeof window.app.openDashboard === 'function') {
+            window.app.openDashboard();
+        } else {
+            const modal = document.getElementById('dashboardModal');
+            if (modal) modal.style.display = 'flex';
+        }
+        if (tabName && window.app && typeof window.app.switchDashboardTab === 'function') {
+            window.app.switchDashboardTab(tabName);
+        }
+        this.refresh?.();
+    }
+
+    hide() {
+        if (window.app && typeof window.app.closeDashboard === 'function') {
+            window.app.closeDashboard();
+        } else {
+            const modal = document.getElementById('dashboardModal');
+            if (modal) modal.style.display = 'none';
         }
     }
 }

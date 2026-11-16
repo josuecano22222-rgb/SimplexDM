@@ -1,13 +1,10 @@
 /**
  * Electron Main Process
- * 
- * This module handles the Electron main process responsibilities including:
- * - Application lifecycle management
- * - Window creation and management
- * - IPC (Inter-Process Communication) handlers
- * - Local HTTP server lifecycle
- * - Content Security Policy configuration
- * 
+ *
+ * Handles application lifecycle, BrowserWindow security configuration,
+ * local loopback HTTP server startup, Content Security Policy, and
+ * IPC registration (including offline GIS and map-label services).
+ *
  * @module ElectronMain
  * @requires electron
  * @requires path
@@ -30,6 +27,38 @@ let serverProcess = null;
 /** @type {number} Port number for the local HTTP server (default: 8000) */
 let serverPort = 8000;
 
+/** Hostnames allowed for online OSM basemap & geocoding fallback when offline assets are absent */
+const OSM_TILE_HOSTS = new Set([
+    'tile.openstreetmap.org',
+    'a.tile.openstreetmap.org',
+    'b.tile.openstreetmap.org',
+    'c.tile.openstreetmap.org',
+    'nominatim.openstreetmap.org',
+]);
+
+/** Safe URL schemes permitted through webRequest without hostname checks */
+const INTERNAL_SAFE_PROTOCOLS = new Set(['blob:', 'data:', 'devtools:', 'chrome-extension:']);
+
+/** Permissions granted only to the local loopback viewer origin */
+const LOCAL_ALLOWED_PERMISSIONS = new Set([
+    'fullscreen',
+    'pointerLock',
+    'clipboard-sanitized-write',
+]);
+
+function isLocalAppOrigin(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== 'string') return false;
+    try {
+        const parsed = new URL(rawUrl);
+        if (parsed.protocol !== 'http:') return false;
+        const isLoopback = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+        if (!isLoopback) return false;
+        return Number(parsed.port) === Number(serverPort);
+    } catch (_) {
+        return false;
+    }
+}
+
 function getSimProjectDir() {
     return process.env.SIM_PROJECT_DIR || path.join(getAppPath(), 'sim');
 }
@@ -44,16 +73,10 @@ function isSimInterfaceEnabled() {
 }
 
 /**
- * Get the correct application path (handles both development and packaged apps)
- * 
- * In packaged apps, app.getAppPath() returns the path to app.asar or resources/app.
- * In development, __dirname works fine.
- * 
- * @returns {string} Absolute path to the application directory
+ * Get the application path (handles both development and ASAR-packaged builds).
+ * @returns {string}
  */
 function getAppPath() {
-    // In packaged apps, app.getAppPath() returns the path to app.asar or resources/app
-    // In development, __dirname works fine
     if (app.isPackaged) {
         return app.getAppPath();
     }
@@ -61,98 +84,86 @@ function getAppPath() {
 }
 
 /**
- * Start local HTTP server (runs inline in main process)
- * 
- * The server is started directly in the main process (not as a separate process)
- * to avoid issues with ASAR packaging and file system access. The server handles:
- * - Serving static files from the public/ directory
- * - Serving tileset files from the data/ directory
- * - Handling file requests via /file endpoint
- * - CORS headers for local development
- * 
- * The function automatically finds an available port starting from 8000.
- * 
- * @returns {Promise<number>} Promise that resolves with the server port number
- * @throws {Error} If server fails to start or times out
+ * Start the local loopback HTTP server inline in the main process.
+ * Automatically probes from port 8000 upward until a free loopback port is found.
+ *
+ * @returns {Promise<number>} Listening port number
  */
 function startServer() {
     return new Promise((resolve, reject) => {
         const appPath = getAppPath();
-        
+
         if (process.env.NODE_ENV === 'development') {
             console.log('App path:', appPath);
             console.log('Is packaged:', app.isPackaged);
         }
-        
-        // Set environment variables for the server module
+
         process.env.APP_PATH = appPath;
+        process.env.HOST = '127.0.0.1';
         process.env.IS_PACKAGED = app.isPackaged ? 'true' : 'false';
-        
-        // Try to find available port
+
+        const MAX_PORT = 8100;
+
         const checkPort = (port) => {
+            if (port > MAX_PORT) {
+                reject(new Error(`No free loopback port found between 8000 and ${MAX_PORT}`));
+                return;
+            }
             const testServer = http.createServer();
-            testServer.listen(port, () => {
+            testServer.once('error', () => {
+                checkPort(port + 1);
+            });
+            testServer.listen(port, '127.0.0.1', () => {
                 testServer.close(() => {
                     serverPort = port;
                     process.env.PORT = port.toString();
-                    
-                    // Try to load and start server inline
+
                     try {
-                        // Try unpacked location first (if exists), then regular location
-                        let serverModule;
+                        let serverModulePath = path.join(appPath, 'server', 'server.js');
                         if (app.isPackaged) {
-                            const unpackedServerPath = path.join(path.dirname(appPath), 'app.asar.unpacked', 'server', 'server.js');
+                            const unpackedServerPath = path.join(
+                                path.dirname(appPath),
+                                'app.asar.unpacked',
+                                'server',
+                                'server.js'
+                            );
                             if (fs.existsSync(unpackedServerPath)) {
-                                // Clear require cache to ensure fresh load
-                                delete require.cache[unpackedServerPath];
-                                serverModule = require(unpackedServerPath);
-                            } else {
-                                // Try regular location (inside asar)
-                                const regularServerPath = path.join(appPath, 'server', 'server.js');
-                                delete require.cache[regularServerPath];
-                                serverModule = require(regularServerPath);
+                                serverModulePath = unpackedServerPath;
                             }
-                        } else {
-                            // Development mode
-                            const serverPath = path.join(appPath, 'server', 'server.js');
-                            delete require.cache[serverPath];
-                            serverModule = require(serverPath);
                         }
-                        
-                        // Start the server
+
+                        delete require.cache[serverModulePath];
+                        const serverModule = require(serverModulePath);
+
                         serverModule.startServer((err, serverInstance) => {
                             if (err) {
                                 console.error('Failed to start server:', err);
                                 reject(err);
                                 return;
                             }
-                            
-                            // Store reference to server for cleanup
+
                             serverProcess = serverInstance;
-                            
-                            // Verify server is responding
+
                             const checkServer = (attempts = 0) => {
-                                if (attempts > 20) { // 10 seconds max wait
-                                    reject(new Error('Server failed to start - timeout'));
+                                if (attempts > 20) {
+                                    reject(new Error('Server failed to respond before timeout'));
                                     return;
                                 }
-                                
-                                // Try to connect to the server
-                                const testReq = http.get(`http://localhost:${serverPort}`, (res) => {
+
+                                const testReq = http.get(`http://127.0.0.1:${serverPort}/`, (res) => {
+                                    res.resume();
                                     if (process.env.NODE_ENV === 'development') {
-                                        console.log(`HTTP server started successfully on port ${serverPort}`);
+                                        console.log(`HTTP server started on http://127.0.0.1:${serverPort}`);
                                     }
                                     resolve(serverPort);
                                 });
-                                
+
                                 testReq.on('error', () => {
-                                    // Server not ready yet, try again
-                                    setTimeout(() => checkServer(attempts + 1), 500);
+                                    setTimeout(() => checkServer(attempts + 1), 250);
                                 });
                             };
-                            
-                            // Start checking after a short delay
-                            setTimeout(() => checkServer(), 500);
+
+                            setTimeout(() => checkServer(), 100);
                         });
                     } catch (err) {
                         console.error('Failed to load server module:', err);
@@ -160,30 +171,14 @@ function startServer() {
                     }
                 });
             });
-            
-            testServer.on('error', () => {
-                // Port in use, try next port
-                checkPort(port + 1);
-            });
         };
-        
+
         checkPort(8000);
     });
 }
 
 /**
- * Create and configure the main application window
- * 
- * Creates a BrowserWindow with appropriate settings for the 3D viewer:
- * - Large default size (1920x1080) with minimum constraints
- * - Context isolation enabled for security
- * - Preload script for secure IPC bridge
- * - Content Security Policy configured for CesiumJS
- * - DevTools enabled in development mode
- * 
- * The window loads the application from the local HTTP server.
- * 
- * @returns {void}
+ * Create and configure the main application BrowserWindow.
  */
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -195,59 +190,70 @@ function createWindow() {
             preload: path.join(getAppPath(), 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
+            enableWebSQL: false,
             webSecurity: true,
-            // Allow unsafe-eval for CesiumJS (required for WebGL shaders)
-            // This is acceptable for a desktop application
-            allowRunningInsecureContent: false
+            allowRunningInsecureContent: false,
         },
         icon: path.join(getAppPath(), 'build', 'icon.png'),
-        show: false // Don't show until ready
+        show: false,
     });
 
-    // Keep base Meridian interface by default.
-    // Enable SIM interface only when SIMPLEX_USE_SIM_INTERFACE=1.
     const simModeEnabled = isSimInterfaceEnabled();
     const targetUrl = simModeEnabled
         ? `http://localhost:${serverPort}/sim/index.html`
         : `http://localhost:${serverPort}/index.html`;
     if (process.env.NODE_ENV === 'development') {
-        console.log(`Loading UI: ${targetUrl}${simModeEnabled ? ' (set SIMPLEX_USE_SIM_INTERFACE=0 for full Meridian toolbar)' : ''}`);
+        console.log(
+            `Loading UI: ${targetUrl}${
+                simModeEnabled ? ' (set SIMPLEX_USE_SIM_INTERFACE=0 for full Meridian toolbar)' : ''
+            }`
+        );
     }
     mainWindow.loadURL(targetUrl);
 
-    // Avoid extra Electron windows: navigate the main window or use the system browser
+    // Restrict popups: same-origin local pages navigate in-place; only http(s) open externally.
     mainWindow.webContents.setWindowOpenHandler((details) => {
-        const url = details.url || '';
+        const rawUrl = details.url || '';
         try {
-            const u = new URL(url);
-            const isLocal =
-                u.hostname === 'localhost' ||
-                u.hostname === '127.0.0.1' ||
-                u.protocol === 'file:';
-            if (isLocal) {
+            const parsed = new URL(rawUrl);
+            if (isLocalAppOrigin(rawUrl)) {
                 setImmediate(() => {
-                    if (!mainWindow.isDestroyed()) {
-                        mainWindow.loadURL(url);
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.loadURL(rawUrl);
                     }
                 });
                 return { action: 'deny' };
             }
-            shell.openExternal(url);
-        } catch {
-            if (url) {
-                shell.openExternal(url);
+            if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+                shell.openExternal(parsed.toString()).catch(() => {});
             }
+        } catch (_) {
+            /* Reject malformed or dangerous schemes */
         }
         return { action: 'deny' };
     });
 
-    // Show window when ready
+    // Block accidental top-level navigation to external or file:// URLs
+    mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+        if (!isLocalAppOrigin(navigationUrl)) {
+            event.preventDefault();
+            try {
+                const parsed = new URL(navigationUrl);
+                if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+                    shell.openExternal(parsed.toString()).catch(() => {});
+                }
+            } catch (_) {
+                /* ignore */
+            }
+        }
+    });
+
     mainWindow.once('ready-to-show', () => {
-        mainWindow.show();
-        
-        // Open DevTools in development
-        if (process.env.NODE_ENV === 'development') {
-            mainWindow.webContents.openDevTools();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.show();
+            if (process.env.NODE_ENV === 'development') {
+                mainWindow.webContents.openDevTools();
+            }
         }
     });
 
@@ -255,124 +261,117 @@ function createWindow() {
         mainWindow = null;
     });
 
-    // Handle window errors
-    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-        console.error('Failed to load:', errorCode, errorDescription);
-        console.error('URL:', validatedURL);
-        
-        // Show error to user if server isn't running
-        if (errorCode === -105 || errorCode === -106) { // ERR_NAME_NOT_RESOLVED or ERR_INTERNET_DISCONNECTED
-            mainWindow.webContents.executeJavaScript(`
-                document.body.innerHTML = \`
-                    <div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; font-family: Arial, sans-serif; color: white; background: #1a1a1a;">
-                        <h1 style="color: #ff4444;">Failed to Connect to Server</h1>
-                        <p>Error: ${errorDescription}</p>
-                        <p>Server Port: ${serverPort}</p>
-                        <p style="margin-top: 20px;">Please check:</p>
-                        <ul style="text-align: left;">
-                            <li>Server is running (check main console)</li>
-                            <li>Port ${serverPort} is not blocked</li>
-                            <li>Open DevTools (F12) for details</li>
-                        </ul>
-                    </div>
-                \`;
-            `);
+    mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+        console.error('Failed to load:', errorCode, errorDescription, 'URL:', validatedURL);
+
+        // ERR_CONNECTION_REFUSED (-102), ERR_NAME_NOT_RESOLVED (-105), ERR_INTERNET_DISCONNECTED (-106)
+        if ((errorCode === -102 || errorCode === -105 || errorCode === -106) && mainWindow && !mainWindow.isDestroyed()) {
+            const safeDesc = JSON.stringify(String(errorDescription || 'Unknown error'));
+            const safePort = Number(serverPort) || 8000;
+            mainWindow.webContents
+                .executeJavaScript(`
+                    (function () {
+                        const root = document.createElement('div');
+                        root.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;font-family:system-ui,sans-serif;color:#fff;background:#1a1a1a;padding:24px;text-align:center;';
+                        const h1 = document.createElement('h1');
+                        h1.style.color = '#ff5252';
+                        h1.textContent = 'Failed to Connect to Local Server';
+                        const errP = document.createElement('p');
+                        errP.textContent = 'Error: ' + ${safeDesc};
+                        const portP = document.createElement('p');
+                        portP.textContent = 'Server Port: ' + ${safePort};
+                        const tipP = document.createElement('p');
+                        tipP.style.marginTop = '16px';
+                        tipP.textContent = 'Verify the local server is running and port ' + ${safePort} + ' is available (press F12 for DevTools).';
+                        root.append(h1, errP, portP, tipP);
+                        document.body.replaceChildren(root);
+                    })();
+                `)
+                .catch(() => {});
         }
     });
-    
-    // Log console messages from renderer for debugging
-    // Filter out CSP warnings since we intentionally use unsafe-eval for CesiumJS
-    mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
-        // Skip CSP warnings - we intentionally use unsafe-eval for CesiumJS WebGL shaders
+
+    mainWindow.webContents.on('console-message', (_event, level, message) => {
         const messageStr = String(message || '');
-        if (messageStr.includes('Content Security Policy') || 
+        if (
+            messageStr.includes('Content Security Policy') ||
             messageStr.includes('Insecure Content-Security-Policy') ||
-            (messageStr.includes('unsafe-eval') && messageStr.includes('Security Warning'))) {
-            return; // Suppress CSP warnings - intentional for CesiumJS
+            (messageStr.includes('unsafe-eval') && messageStr.includes('Security Warning'))
+        ) {
+            return;
         }
-        if (level >= 2) { // Warning or error
+        if (level >= 2) {
             console.log(`[Renderer ${level === 2 ? 'WARN' : 'ERROR'}]`, message);
         }
     });
-    
-    // Handle JavaScript errors in renderer
-    mainWindow.webContents.on('render-process-gone', (event, details) => {
+
+    mainWindow.webContents.on('render-process-gone', (_event, details) => {
         console.error('Renderer process crashed:', details);
     });
-    
-    mainWindow.webContents.setDevToolsWebContents = () => {}; // Prevent errors
+
+    mainWindow.webContents.setDevToolsWebContents = () => {};
 }
 
-/**
- * Application initialization
- * 
- * Sets up the application when Electron is ready:
- * 1. Configures Content Security Policy for CesiumJS workers
- * 2. Starts the local HTTP server
- * 3. Creates the main application window
- * 4. Sets up window activation handlers
- * 
- * @event app#whenReady
- */
 app.whenReady().then(async () => {
     try {
-        // Deny all permission requests for security
-        // This prevents the app from requesting camera, microphone, geolocation, notifications, network, etc.
+        // Permit only safe UI permissions (fullscreen, pointer lock for flight mode, clipboard copy)
+        // for the local loopback viewer; deny camera, microphone, geolocation, MIDI, notifications, etc.
         session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-            // Only log unexpected permission requests in development
-            if (process.env.NODE_ENV === 'development' && 
-                !['media', 'geolocation', 'notifications', 'background-sync', 'web-app-installation'].includes(permission)) {
-                console.log(`Permission request denied: ${permission}`);
-            }
-            // Explicitly deny network-related permissions
-            if (permission === 'media' || permission === 'geolocation' || permission === 'notifications' || 
-                permission === 'midi' || permission === 'pointerLock' || permission === 'fullscreen' ||
-                permission === 'openExternal') {
-                callback(false);
+            const originUrl = webContents ? webContents.getURL() : '';
+            if (LOCAL_ALLOWED_PERMISSIONS.has(permission) && isLocalAppOrigin(originUrl)) {
+                callback(true);
                 return;
             }
-            // Deny all other permission requests
             callback(false);
         });
-        
-        // Deny all permission check results (for permissions that were previously granted)
-        session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
-            // Only log unexpected permission checks in development
-            if (process.env.NODE_ENV === 'development' && 
-                !['media', 'geolocation', 'notifications', 'background-sync', 'web-app-installation'].includes(permission)) {
-                console.log(`Permission check denied: ${permission} from ${requestingOrigin}`);
-            }
-            // Deny all permission checks, especially network-related ones
-            return false;
+
+        session.defaultSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin) => {
+            return LOCAL_ALLOWED_PERMISSIONS.has(permission) && isLocalAppOrigin(requestingOrigin);
         });
-        
+
         const simModeEnabled = isSimInterfaceEnabled();
-        const allowedHosts = new Set(['localhost', '127.0.0.1', '::1']);
+        const offlineStrict = process.env.SIMPLEX_STRICT_OFFLINE === '1';
+        const allowedHosts = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+        if (!offlineStrict) {
+            for (const host of OSM_TILE_HOSTS) {
+                allowedHosts.add(host);
+            }
+        }
         if (simModeEnabled) {
-            // SIM uses Cesium CDN + OSM tiles in its stock index.html.
             allowedHosts.add('cesium.com');
-            allowedHosts.add('tile.openstreetmap.org');
         }
 
-        // Block all other network requests.
+        // Restrict outbound renderer traffic to local loopback, safe internal schemes (blob:/data:/devtools:),
+        // and optional OpenStreetMap tile hosts for documented online basemap fallback.
         session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
-            const url = new URL(details.url);
-            if (!allowedHosts.has(url.hostname)) {
-                // Don't log devtools:// URLs as they're expected to be blocked
-                if (!details.url.startsWith('devtools://') && process.env.NODE_ENV === 'development') {
-                    console.log(`Blocked external network request: ${details.url}`);
+            try {
+                const parsed = new URL(details.url);
+                if (INTERNAL_SAFE_PROTOCOLS.has(parsed.protocol)) {
+                    callback({});
+                    return;
                 }
-                callback({ cancel: true });
-                return;
+                if (allowedHosts.has(parsed.hostname)) {
+                    callback({});
+                    return;
+                }
+            } catch (_) {
+                /* Cancel unparseable URLs */
             }
-            callback({});
+            if (process.env.NODE_ENV === 'development') {
+                console.log(`Blocked external network request: ${details.url}`);
+            }
+            callback({ cancel: true });
         });
-        
-        // Configure Content Security Policy
+
+        const osmCsp = offlineStrict
+            ? ''
+            : ' https://tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org';
+        const nominatimCsp = offlineStrict ? '' : ' https://nominatim.openstreetmap.org';
+
         session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
             const cspConnect = simModeEnabled
-                ? "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* https://cesium.com https://tile.openstreetmap.org data: blob:;"
-                : "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* data: blob:;";
+                ? `connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* https://cesium.com${osmCsp}${nominatimCsp} data: blob:;`
+                : `connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*${osmCsp}${nominatimCsp} data: blob:;`;
             const cspStyle = simModeEnabled
                 ? "style-src 'self' 'unsafe-inline' https://cesium.com;"
                 : "style-src 'self' 'unsafe-inline';";
@@ -380,33 +379,29 @@ app.whenReady().then(async () => {
                 ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cesium.com blob:;"
                 : "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:;";
             const cspImage = simModeEnabled
-                ? "img-src 'self' http://localhost:* http://127.0.0.1:* https://tile.openstreetmap.org https://cesium.com data: blob:;"
-                : "img-src 'self' http://localhost:* http://127.0.0.1:* data: blob:;";
+                ? `img-src 'self' http://localhost:* http://127.0.0.1:* https://cesium.com${osmCsp} data: blob:;`
+                : `img-src 'self' http://localhost:* http://127.0.0.1:*${osmCsp} data: blob:;`;
             callback({
                 responseHeaders: {
                     ...details.responseHeaders,
                     'Content-Security-Policy': [
                         "default-src 'self' http://localhost:* http://127.0.0.1:* data: blob:; " +
-                        `${cspScript} ` +
-                        "worker-src 'self' blob:; " +
-                        `${cspStyle} ` +
-                        `${cspImage} ` +
-                        "font-src 'self' data:; " +
-                        cspConnect
-                    ]
-                }
+                            `${cspScript} ` +
+                            "worker-src 'self' blob:; " +
+                            `${cspStyle} ` +
+                            `${cspImage} ` +
+                            "font-src 'self' data:; " +
+                            cspConnect,
+                    ],
+                },
             });
         });
-        
-        // Expose SIM path override to the local server.
+
         process.env.SIM_PROJECT_DIR = getSimProjectDir();
 
-        // Start HTTP server first
         await startServer();
-        
-        // Create window
         createWindow();
-        
+
         app.on('activate', () => {
             if (BrowserWindow.getAllWindows().length === 0) {
                 createWindow();
@@ -418,20 +413,16 @@ app.whenReady().then(async () => {
     }
 });
 
-// Quit when all windows are closed
 app.on('window-all-closed', () => {
-    // Stop server (it's now an HTTP server instance, not a process)
     if (serverProcess && typeof serverProcess.close === 'function') {
         serverProcess.close();
         serverProcess = null;
     }
-    
     if (process.platform !== 'darwin') {
         app.quit();
     }
 });
 
-// Handle application quit
 app.on('before-quit', () => {
     if (serverProcess && typeof serverProcess.close === 'function') {
         serverProcess.close();
@@ -443,38 +434,34 @@ app.on('before-quit', () => {
 // IPC Handlers
 // ============================================================================
 
-/**
- * IPC Handler: Get Server Port
- * 
- * Returns the port number on which the local HTTP server is running.
- * Used by the renderer process to construct URLs for file requests.
- * 
- * @returns {number} Server port number
- */
-ipcMain.handle('get-server-port', () => {
-    return serverPort;
-});
+ipcMain.handle('get-server-port', () => serverPort);
+ipcMain.handle('get-app-version', () => app.getVersion());
+ipcMain.handle('get-app-path', () => app.getPath('userData'));
 
-/**
- * IPC Handler: Get Application Version
- * 
- * Returns the application version from package.json.
- * 
- * @returns {string} Application version string
- */
-ipcMain.handle('get-app-version', () => {
-    return app.getVersion();
-});
-
-/**
- * IPC Handler: Get Application Path
- * 
- * Returns the user data directory path where application data is stored.
- * 
- * @returns {string} Absolute path to user data directory
- */
-ipcMain.handle('get-app-path', () => {
-    return app.getPath('userData');
+ipcMain.handle('dialog:open-file', async (_event, opts = {}) => {
+    const allowedProps = new Set(['openFile', 'openDirectory', 'multiSelections']);
+    const requestedProps = Array.isArray(opts?.properties)
+        ? opts.properties.filter((p) => allowedProps.has(p))
+        : ['openFile'];
+    const dialogOpts = {
+        title: typeof opts?.title === 'string' ? opts.title : 'Select File',
+        properties: requestedProps.length ? requestedProps : ['openFile'],
+    };
+    if (Array.isArray(opts?.filters) && opts.filters.length > 0) {
+        dialogOpts.filters = opts.filters
+            .filter((f) => f && typeof f.name === 'string' && Array.isArray(f.extensions))
+            .map((f) => ({
+                name: f.name,
+                extensions: f.extensions.map((e) => String(e).replace(/^\./, '')),
+            }));
+    }
+    const result = mainWindow && !mainWindow.isDestroyed()
+        ? await dialog.showOpenDialog(mainWindow, dialogOpts)
+        : await dialog.showOpenDialog(dialogOpts);
+    return {
+        canceled: Boolean(result.canceled),
+        filePaths: Array.isArray(result.filePaths) ? result.filePaths : [],
+    };
 });
 
 // ============================================================================

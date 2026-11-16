@@ -1,7 +1,23 @@
 /**
  * PathResolver
- * Handles path resolution and normalization for various path formats
+ * Resolves and normalizes Windows paths, POSIX paths, relative paths, and HTTP URLs
+ * for 3D Tiles and offline geospatial assets.
  */
+
+const UNIX_FS_PREFIXES = [
+    '/home/',
+    '/Users/',
+    '/var/',
+    '/tmp/',
+    '/private/',
+    '/opt/',
+    '/mnt/',
+    '/media/',
+    '/Volumes/',
+    '/srv/',
+    '/run/',
+    '/root/',
+];
 
 class PathResolver {
     constructor() {
@@ -9,14 +25,18 @@ class PathResolver {
         this.fileHandleRegistry = null;
     }
 
-    /**
-     * Initialize with dependencies
-     */
     async init(fileHandleRegistry) {
         this.fileHandleRegistry = fileHandleRegistry;
-        
-        // Get server port from electron API or detect from current URL
-        if (window.electronAPI) {
+
+        const hasHttpOrigin =
+            typeof window !== 'undefined' &&
+            typeof window.location?.origin === 'string' &&
+            /^https?:\/\//i.test(window.location.origin);
+
+        if (
+            window.electronAPI?.isElectron === true &&
+            typeof window.electronAPI.getServerPort === 'function'
+        ) {
             try {
                 const rawPort = await window.electronAPI.getServerPort();
                 const portNum = Number(rawPort);
@@ -25,97 +45,145 @@ class PathResolver {
                         ? portNum
                         : parseInt(window.location.port, 10) || 8000;
                 this.baseUrl = `http://localhost:${port}`;
-            } catch (e) {
-                // Fallback: use current origin (works for both localhost and web)
-                this.baseUrl = window.location.origin;
+            } catch (_) {
+                this.baseUrl = hasHttpOrigin ? window.location.origin : '';
             }
         } else {
-            // Web mode: use current origin (works for localhost, IP addresses, and domains)
-            this.baseUrl = window.location.origin;
+            this.baseUrl = hasHttpOrigin ? window.location.origin : '';
         }
-        
-        console.log('PathResolver initialized with baseUrl:', this.baseUrl);
     }
 
     /**
-     * Normalize path (convert backslashes to forward slashes)
+     * Normalize filesystem/relative path separators while keeping URL schemes intact.
      */
-    normalizePath(path) {
-        if (!path) return path;
-        
-        // Convert backslashes to forward slashes
-        path = path.replace(/\\/g, '/');
-        
-        // Remove duplicate slashes
-        path = path.replace(/\/+/g, '/');
-        
-        // Handle Windows drive letters
-        const driveMatch = path.match(/^([A-Za-z]:)/);
-        if (driveMatch) {
-            return driveMatch[1] + path.substring(2);
+    normalizePath(inputPath) {
+        if (!inputPath || typeof inputPath !== 'string') return inputPath;
+        if (this.isHttpUrl(inputPath) || inputPath.startsWith('blob:') || inputPath.startsWith('data:')) {
+            return inputPath;
         }
-        
-        return path;
-    }
 
-    /**
-     * Check if path is a Windows absolute path
-     */
-    isWindowsPath(path) {
-        return /^[A-Za-z]:/.test(path);
-    }
-
-    /**
-     * Check if path is an HTTP URL
-     */
-    isHttpUrl(path) {
-        return /^https?:\/\//.test(path);
-    }
-
-    /**
-     * Check if path is relative
-     */
-    isRelativePath(path) {
-        return path.startsWith('./') || path.startsWith('../') || 
-               (!this.isWindowsPath(path) && !this.isHttpUrl(path) && !path.startsWith('/'));
-    }
-
-    /**
-     * Resolve relative path against base URL
-     */
-    resolveRelativePath(path, basePath) {
-        if (!basePath) {
-            basePath = this.baseUrl;
+        // Preserve UNC prefix `\\server\share`
+        const isUnc = inputPath.startsWith('\\\\');
+        let p = inputPath.replace(/\\/g, '/').replace(/\/+/g, '/');
+        if (isUnc) {
+            p = '//' + p.replace(/^\/+/, '');
         }
-        
-        // If basePath is a file, get its directory
-        if (basePath.includes('/') && !basePath.endsWith('/')) {
-            const lastSlash = basePath.lastIndexOf('/');
-            basePath = basePath.substring(0, lastSlash + 1);
+        return p;
+    }
+
+    isWindowsPath(inputPath) {
+        return (
+            typeof inputPath === 'string' &&
+            (/^[A-Za-z]:/.test(inputPath) || inputPath.startsWith('\\\\') || inputPath.startsWith('//'))
+        );
+    }
+
+    isUnixFilesystemPath(inputPath) {
+        if (typeof inputPath !== 'string' || !inputPath.startsWith('/')) return false;
+        return UNIX_FS_PREFIXES.some((prefix) => inputPath.startsWith(prefix));
+    }
+
+    isAbsoluteFilesystemPath(inputPath) {
+        return this.isWindowsPath(inputPath) || this.isUnixFilesystemPath(inputPath);
+    }
+
+    isHttpUrl(inputPath) {
+        return typeof inputPath === 'string' && /^https?:\/\//i.test(inputPath);
+    }
+
+    isRelativePath(inputPath) {
+        if (typeof inputPath !== 'string' || !inputPath) return false;
+        return (
+            inputPath.startsWith('./') ||
+            inputPath.startsWith('../') ||
+            (!this.isWindowsPath(inputPath) && !this.isHttpUrl(inputPath) && !inputPath.startsWith('/'))
+        );
+    }
+
+    /**
+     * Join path or URL segments cleanly without corrupting `http://`, `C:/`, or leading `/`.
+     */
+    join(...segments) {
+        const filtered = segments.filter((s) => typeof s === 'string' && s.length > 0);
+        if (filtered.length === 0) return '';
+        const first = filtered[0];
+
+        if (this.isHttpUrl(first)) {
+            let base = first.endsWith('/') ? first : `${first}/`;
+            for (let i = 1; i < filtered.length; i++) {
+                const seg = filtered[i].replace(/\\/g, '/').replace(/^\/+/, '');
+                base = new URL(seg, base.endsWith('/') ? base : `${base}/`).toString();
+            }
+            return base;
         }
-        
-        // Resolve relative path
-        const parts = basePath.split('/').filter(p => p);
-        const pathParts = path.split('/').filter(p => p);
-        
-        for (const part of pathParts) {
-            if (part === '.') {
-                continue;
-            } else if (part === '..') {
-                parts.pop();
+
+        const leadingSlash = first.startsWith('/');
+        const joined = filtered
+            .map((s, idx) => {
+                const norm = s.replace(/\\/g, '/');
+                if (idx === 0) return norm.replace(/\/+$/, '');
+                return norm.replace(/^\/+|\/+$/g, '');
+            })
+            .filter(Boolean)
+            .join('/');
+
+        return this.resolveDotSegments(leadingSlash && !joined.startsWith('/') ? `/${joined}` : joined);
+    }
+
+    resolveDotSegments(p) {
+        const driveMatch = /^([A-Za-z]:)(\/.*)?$/.exec(p);
+        const prefix = driveMatch ? `${driveMatch[1]}/` : p.startsWith('/') ? '/' : '';
+        const rest = driveMatch ? driveMatch[2] || '' : p;
+        const out = [];
+        for (const seg of rest.split('/')) {
+            if (!seg || seg === '.') continue;
+            if (seg === '..') {
+                if (out.length > 0 && out[out.length - 1] !== '..') out.pop();
+                else if (!prefix) out.push('..');
             } else {
-                parts.push(part);
+                out.push(seg);
             }
         }
-        
-        return parts.join('/');
+        return prefix + out.join('/');
     }
 
     /**
-     * Resolve path to usable URL
+     * Resolve a relative path against a base URL (including `/file?path=...`), Windows path, or POSIX path.
      */
-    async resolvePath(path, basePath = null) {
-        if (!path) {
+    resolveRelativePath(relPath, basePath) {
+        const base = basePath || (this.baseUrl ? `${this.baseUrl}/` : '');
+        const cleanRel = String(relPath || '').replace(/\\/g, '/');
+
+        // Special case: base URL is `/file?path=<absFileOrDir>`
+        if (this.isHttpUrl(base)) {
+            try {
+                const u = new URL(base);
+                if (u.pathname === '/file' && u.searchParams.has('path')) {
+                    const fsBase = this.normalizePath(u.searchParams.get('path') || '');
+                    const fsDir = /\.[a-z0-9]{1,8}$/i.test(fsBase) ? this.getDirectory(fsBase) : fsBase;
+                    const combined = this.join(fsDir, cleanRel);
+                    return `${u.origin}/file?path=${encodeURIComponent(combined)}`;
+                }
+                return new URL(cleanRel, base).toString();
+            } catch (_) {
+                /* fall through */
+            }
+        }
+
+        const normBase = this.normalizePath(base);
+        const baseDir = normBase.endsWith('/') ? normBase.slice(0, -1) : this.getDirectory(normBase);
+        const combined = this.join(baseDir, cleanRel);
+        if (this.isAbsoluteFilesystemPath(combined) && this.baseUrl) {
+            return `${this.baseUrl}/file?path=${encodeURIComponent(combined)}`;
+        }
+        return combined;
+    }
+
+    /**
+     * Resolve a filesystem path, relative path, or URL to a fetchable HTTP URL (or `{ type: 'fileHandle' }`).
+     */
+    async resolvePath(inputPath, basePath = null) {
+        if (!inputPath || typeof inputPath !== 'string' || !inputPath.trim()) {
             const error = new Error('Path is required. Please provide a valid file path or URL.');
             error.code = 'PATH_REQUIRED';
             if (window.notification) {
@@ -125,99 +193,107 @@ class PathResolver {
             }
             throw error;
         }
-        
-        // Ensure baseUrl is initialized
+
+        const trimmed = inputPath.trim();
         if (!this.baseUrl) {
-            // Try to initialize on the fly if not already done
-            this.baseUrl = window.location.origin;
-            console.warn('PathResolver.resolvePath called before init(), using current origin:', this.baseUrl);
+            this.baseUrl =
+                window.location && window.location.origin && window.location.origin !== 'null'
+                    ? window.location.origin
+                    : 'http://localhost:8000';
         }
-        
-        // If it's already an HTTP URL, return as-is (before normalization)
-        if (this.isHttpUrl(path)) {
-            return path;
+
+        if (this.isHttpUrl(trimmed) || trimmed.startsWith('blob:') || trimmed.startsWith('data:')) {
+            return trimmed;
         }
-        
-        // Normalize path (only for non-HTTP paths)
-        path = this.normalizePath(path);
-        
-        // If it's a Windows path, check for file handle first
-        if (this.isWindowsPath(path)) {
-            if (this.fileHandleRegistry) {
-                const handle = this.fileHandleRegistry.getHandle(path);
+
+        const normalized = this.normalizePath(trimmed);
+
+        // Windows drive/UNC path or POSIX absolute filesystem path -> fileHandle or `/file?path=`
+        if (this.isAbsoluteFilesystemPath(normalized)) {
+            if (this.fileHandleRegistry && typeof this.fileHandleRegistry.getHandle === 'function') {
+                const handle = this.fileHandleRegistry.getHandle(normalized);
                 if (handle) {
-                    // Return a special marker that indicates file handle usage
-                    return { type: 'fileHandle', path, handle };
+                    return { type: 'fileHandle', path: normalized, handle };
                 }
             }
-            
-            // For Windows paths, always use /file endpoint to serve arbitrary file paths
-            // This ensures external files (outside app directory) are properly served
-            // Encode the path to handle special characters and spaces
-            const encodedPath = encodeURIComponent(path);
-            return `${this.baseUrl}/file?path=${encodedPath}`;
+            return `${this.baseUrl}/file?path=${encodeURIComponent(normalized)}`;
         }
-        
-        // If it's a relative path (starts with ./ or ../)
-        if (path.startsWith('./') || path.startsWith('../')) {
+
+        // Explicit relative path (`./` or `../`)
+        if (normalized.startsWith('./') || normalized.startsWith('../')) {
             if (basePath) {
-                return this.resolveRelativePath(path, basePath);
-            } else {
-                // Remove leading ./ or ../
-                const cleanPath = path.replace(/^\.\.?\//, '');
-                return `${this.baseUrl}/data/${cleanPath}`;
+                return this.resolveRelativePath(normalized, basePath);
             }
+            const cleanRel = normalized.replace(/^(?:\.\.?\/)+/, '');
+            return `${this.baseUrl}/data/${cleanRel}`;
         }
-        
-        // If it doesn't start with / and isn't Windows path, treat as relative to data
-        if (!path.startsWith('/') && !this.isWindowsPath(path)) {
-            return `${this.baseUrl}/data/${path}`;
+
+        // Web root path (`/data/...`, `/lib/...`, `/file?...`)
+        if (normalized.startsWith('/')) {
+            return `${this.baseUrl}${normalized}`;
         }
-        
-        // If it starts with /, treat as absolute from server root
-        if (path.startsWith('/')) {
-            return `${this.baseUrl}${path}`;
+
+        // Relative path with an explicit basePath
+        if (basePath) {
+            return this.resolveRelativePath(normalized, basePath);
         }
-        
-        // Default: treat as relative to data directory
-        return `${this.baseUrl}/data/${path}`;
+
+        // Already prefixed with `data/` -> avoid doubling `/data/data/...`
+        if (normalized.toLowerCase().startsWith('data/')) {
+            return `${this.baseUrl}/${normalized}`;
+        }
+
+        return `${this.baseUrl}/data/${normalized}`;
     }
 
-    /**
-     * Extract filename from path
-     */
-    getFilename(path) {
-        const normalized = this.normalizePath(path);
+    getFilename(inputPath) {
+        if (!inputPath) return '';
+        const normalized = this.normalizePath(String(inputPath));
         const parts = normalized.split('/');
-        return parts[parts.length - 1] || path;
+        return parts[parts.length - 1] || normalized;
     }
 
-    /**
-     * Extract directory from path
-     */
-    getDirectory(path) {
-        const normalized = this.normalizePath(path);
+    getDirectory(inputPath) {
+        if (!inputPath) return '';
+        const normalized = this.normalizePath(String(inputPath));
         const lastSlash = normalized.lastIndexOf('/');
         if (lastSlash === -1) return '';
+        if (lastSlash === 0) return '/';
+        if (/^[A-Za-z]:$/.test(normalized.substring(0, lastSlash))) {
+            return normalized.substring(0, lastSlash + 1);
+        }
         return normalized.substring(0, lastSlash);
     }
 
-    /**
-     * Get tileset name from URL (extracts filename, handles query parameters)
-     * @param {string} url - URL or path to extract name from
-     * @returns {string} Tileset name
-     */
     getTilesetName(url) {
-        if (!url) return '';
-        
-        // Remove query parameters and hash
-        const cleanUrl = url.split('?')[0].split('#')[0];
-        
-        // Extract filename from path
-        const parts = cleanUrl.split('/');
+        if (!url || typeof url !== 'string') return '';
+        const pickReadable = (parts, fallback) => {
+            if (!parts.length) return fallback;
+            const last = parts[parts.length - 1];
+            if (last.toLowerCase() === 'tileset.json' && parts.length >= 2) {
+                return parts[parts.length - 2];
+            }
+            return last;
+        };
+        try {
+            if (this.isHttpUrl(url)) {
+                const parsed = new URL(url);
+                const pathParam = parsed.searchParams.get('path');
+                if (pathParam) {
+                    const norm = this.normalizePath(pathParam);
+                    return pickReadable(norm.split('/').filter(Boolean), pathParam);
+                }
+                const parts = parsed.pathname.split('/').filter(Boolean);
+                return pickReadable(parts, url);
+            }
+        } catch (_) {
+            /* fallback */
+        }
+        const cleanUrl = this.normalizePath(url.split('?')[0].split('#')[0]);
+        const parts = cleanUrl.split('/').filter(Boolean);
         return parts[parts.length - 1] || url;
     }
 }
 
-// Export singleton instance
+window.PathResolver = PathResolver;
 window.pathResolver = new PathResolver();

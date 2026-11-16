@@ -157,10 +157,27 @@ class GeoPackageService {
     const gpkg = await GeoPackageAPI.open(gpkgPath);
     try {
       const featureDao = gpkg.getFeatureDao(layerId);
-      const where = query?.where ? String(query.where) : null;
+      const rawWhere = query?.where ? String(query.where).trim() : '';
+      let where = null;
+      let whereArgs = undefined;
+      if (rawWhere) {
+        if (
+          rawWhere.length > 512 ||
+          /[;]|--|\/\*|\*\//.test(rawWhere) ||
+          /\b(?:DROP|DELETE|UPDATE|INSERT|ALTER|CREATE|ATTACH|DETACH|PRAGMA|UNION|SELECT|REPLACE|VACUUM)\b/i.test(
+            rawWhere
+          )
+        ) {
+          throw new Error('Unsafe SQL filter expression rejected');
+        }
+        where = rawWhere;
+        if (Array.isArray(query?.whereArgs)) {
+          whereArgs = query.whereArgs;
+        }
+      }
       const rows = [];
       const iter = where
-        ? featureDao.queryForEach(where)
+        ? featureDao.queryForEach(where, whereArgs)
         : featureDao.queryForEach();
 
       let idx = 0;

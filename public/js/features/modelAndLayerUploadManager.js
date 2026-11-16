@@ -154,7 +154,7 @@ class ModelAndLayerUploadManager {
                                     Choose File
                                 </label>
                                 <input type="file" id="vectorFileInput" 
-                                       accept=".geojson,.json,.kml,.kmz,.zip,.shp" 
+                                       accept=".geojson,.json,.kml,.kmz,.czml,.csv,.gpkg,.zip,.shp" 
                                        style="display: none;">
                                 <button class="btn btn-secondary" id="selectVectorFileBtn">
                                     <span>📁</span> Select File
@@ -527,24 +527,43 @@ class ModelAndLayerUploadManager {
         reader.onload = (e) => {
             try {
                 const text = e.target.result;
-                let data;
-
-                if (layerData.file.name.endsWith('.geojson') || layerData.file.name.endsWith('.json')) {
-                    data = JSON.parse(text);
+                const lowerName = String(layerData.file.name || '').toLowerCase();
+                if (lowerName.endsWith('.geojson') || lowerName.endsWith('.json')) {
+                    const data = JSON.parse(text);
                     this.addGeoJSONToViewer(data, layerData);
-                } else if (layerData.file.name.endsWith('.kml') || layerData.file.name.endsWith('.kmz')) {
-                    // KML parsing would require a library
-                    if (window.notification) {
-                        window.notification.info(
-                            window.appI18n?.nt ? window.appI18n.nt('kmlLibHint') : 'KML support requires additional library'
-                        );
+                } else if (lowerName.endsWith('.czml')) {
+                    const czml = JSON.parse(text);
+                    this.addCzmlToViewer(czml, layerData);
+                } else if (lowerName.endsWith('.csv')) {
+                    const geojson = this.parseCsvToGeoJSON(text);
+                    this.addGeoJSONToViewer(geojson, layerData);
+                } else if (lowerName.endsWith('.kml') || lowerName.endsWith('.kmz')) {
+                    this.addKmlToViewer(layerData.file, layerData);
+                } else if (
+                    (lowerName.endsWith('.shp') || lowerName.endsWith('.zip') || lowerName.endsWith('.gpkg')) &&
+                    window.electronAPI?.gis?.io?.importFile &&
+                    window.gisProjectManager?.currentProjectPath
+                ) {
+                    const nativePath =
+                        window.electronAPI?.getPathForFile?.(layerData.file) || layerData.file.path || '';
+                    if (nativePath) {
+                        window.electronAPI.gis.io
+                            .importFile(window.gisProjectManager.currentProjectPath, {
+                                filePath: nativePath,
+                                layerName: layerData.name,
+                            })
+                            .then(() => {
+                                window.notification?.success?.(`Imported ${layerData.name}`);
+                            })
+                            .catch((err) => {
+                                console.error('GIS layer import failed:', err);
+                                window.notification?.error?.(err.message || 'GIS layer import failed');
+                            });
                     }
                 } else {
-                    if (window.notification) {
-                        window.notification.info(
-                            window.appI18n?.nt ? window.appI18n.nt('shpHint') : 'Shapefile support requires additional processing'
-                        );
-                    }
+                    window.notification?.info?.(
+                        window.appI18n?.nt ? window.appI18n.nt('shpHint') : 'Open a GIS project to import Shapefile/GeoPackage layers'
+                    );
                 }
             } catch (error) {
                 console.error('Error processing vector layer:', error);
@@ -556,7 +575,182 @@ class ModelAndLayerUploadManager {
             }
         };
 
+        const fname = String(layerData.file?.name || '').toLowerCase();
+        if (fname.endsWith('.kmz')) {
+            this.addKmlToViewer(layerData.file, layerData);
+            return;
+        }
         reader.readAsText(layerData.file);
+    }
+
+    /**
+     * Load KML or KMZ directly into CesiumJS via `Cesium.KmlDataSource`.
+     */
+    addKmlToViewer(fileOrBlob, layerData) {
+        const viewer = this.tilesetViewer?.viewer;
+        if (!viewer || typeof Cesium === 'undefined' || !Cesium.KmlDataSource) return;
+        Cesium.KmlDataSource.load(fileOrBlob, {
+            camera: viewer.scene.camera,
+            canvas: viewer.scene.canvas,
+            clampToGround: true,
+        })
+            .then((dataSource) => {
+                viewer.dataSources.add(dataSource);
+                layerData.dataSource = dataSource;
+                dataSource.show = layerData.visible !== false;
+                layerData.visible = dataSource.show;
+                if (dataSource.entities?.values?.length > 0) {
+                    viewer.flyTo(dataSource.entities.values);
+                }
+                viewer.scene?.requestRender?.();
+            })
+            .catch((err) => {
+                console.error('Error loading KML/KMZ:', err);
+                window.notification?.error?.(`Failed to load KML/KMZ: ${err.message}`);
+            });
+    }
+
+    /**
+     * Load CZML directly into CesiumJS via `Cesium.CzmlDataSource`.
+     */
+    addCzmlToViewer(czml, layerData) {
+        const viewer = this.tilesetViewer?.viewer;
+        if (!viewer || typeof Cesium === 'undefined' || !Cesium.CzmlDataSource) return;
+        Cesium.CzmlDataSource.load(czml)
+            .then((dataSource) => {
+                viewer.dataSources.add(dataSource);
+                layerData.dataSource = dataSource;
+                dataSource.show = layerData.visible !== false;
+                layerData.visible = dataSource.show;
+                if (dataSource.entities?.values?.length > 0) {
+                    viewer.flyTo(dataSource.entities.values);
+                }
+                viewer.scene?.requestRender?.();
+            })
+            .catch((err) => {
+                console.error('Error loading CZML:', err);
+                window.notification?.error?.(`Failed to load CZML: ${err.message}`);
+            });
+    }
+
+    /**
+     * Parse CSV with lon/lat (and optional height/elevation) columns into a GeoJSON FeatureCollection.
+     */
+    parseCsvToGeoJSON(text) {
+        const lines = String(text || '')
+            .replace(/^\uFEFF/, '')
+            .split(/\r?\n/)
+            .filter((l) => l.trim().length > 0);
+        if (lines.length < 2) return { type: 'FeatureCollection', features: [] };
+
+        const parseRow = (line) => {
+            const cells = [];
+            let cur = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const ch = line[i];
+                if (inQuotes) {
+                    if (ch === '"' && line[i + 1] === '"') {
+                        cur += '"';
+                        i++;
+                    } else if (ch === '"') {
+                        inQuotes = false;
+                    } else {
+                        cur += ch;
+                    }
+                } else if (ch === '"') {
+                    inQuotes = true;
+                } else if (ch === ',') {
+                    cells.push(cur.trim());
+                    cur = '';
+                } else {
+                    cur += ch;
+                }
+            }
+            cells.push(cur.trim());
+            return cells;
+        };
+
+        const headers = parseRow(lines[0]);
+        const lower = headers.map((h) => h.toLowerCase());
+        const lonIdx = lower.findIndex((h) => ['lon', 'lng', 'long', 'longitude', 'x'].includes(h));
+        const latIdx = lower.findIndex((h) => ['lat', 'latitude', 'y'].includes(h));
+        const zIdx = lower.findIndex((h) => ['z', 'alt', 'altitude', 'elev', 'elevation', 'height'].includes(h));
+        if (lonIdx < 0 || latIdx < 0) {
+            throw new Error('CSV must include longitude (lon/lng/x) and latitude (lat/y) columns');
+        }
+
+        const features = [];
+        for (let r = 1; r < lines.length; r++) {
+            const vals = parseRow(lines[r]);
+            const lon = Number(vals[lonIdx]);
+            const lat = Number(vals[latIdx]);
+            if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+            const z = zIdx >= 0 ? Number(vals[zIdx]) : NaN;
+            const coords = Number.isFinite(z) ? [lon, lat, z] : [lon, lat];
+            const props = {};
+            headers.forEach((h, idx) => {
+                if (idx !== lonIdx && idx !== latIdx) props[h] = vals[idx] ?? '';
+            });
+            features.push({
+                type: 'Feature',
+                properties: props,
+                geometry: { type: 'Point', coordinates: coords },
+            });
+        }
+        return { type: 'FeatureCollection', features };
+    }
+
+    /**
+     * Programmatic entry point for loading a vector/tabular file (e.g. from viewport drag-and-drop).
+     */
+    async loadLayerFile(file, options = {}) {
+        if (!file) return null;
+        const layerData = {
+            id: `layer_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            type: 'vector',
+            name: options.name || file.name.replace(/\.[^.]+$/, ''),
+            file,
+            style: options.style || 'default',
+            color: options.color || '#00e5ff',
+            visible: true,
+            uploadedAt: new Date().toISOString(),
+        };
+        this.uploadedLayers.push(layerData);
+        this.loadVectorLayerToViewer(layerData);
+        this.updateUploadedItemsList();
+        window.notification?.success?.(`Loaded layer: ${layerData.name}`);
+        return layerData;
+    }
+
+    /**
+     * Programmatic entry point for loading a `.glb`/`.gltf` model file at the current camera target.
+     */
+    async loadModelFile(file, options = {}) {
+        if (!file) return null;
+        const cam = this.tilesetViewer?.getCameraPosition?.() || { lon: 0, lat: 0, height: 0 };
+        const modelData = {
+            id: `model_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            type: 'architectural',
+            name: options.name || file.name.replace(/\.[^.]+$/, ''),
+            file,
+            position: {
+                lon: Number.isFinite(options.lon) ? options.lon : cam.lon,
+                lat: Number.isFinite(options.lat) ? options.lat : cam.lat,
+                height: Number.isFinite(options.height) ? options.height : 0,
+            },
+            scale: Number.isFinite(options.scale) ? options.scale : 1,
+            rotation: Number.isFinite(options.rotation) ? options.rotation : 0,
+            visible: true,
+            uploadedAt: new Date().toISOString(),
+        };
+        this.uploadedModels.push(modelData);
+        if (typeof this.loadModelToViewer === 'function') {
+            await this.loadModelToViewer(modelData);
+        }
+        this.updateUploadedItemsList();
+        window.notification?.success?.(`Loaded 3D model: ${modelData.name}`);
+        return modelData;
     }
 
     /**
@@ -617,15 +811,22 @@ class ModelAndLayerUploadManager {
         const titleShow = nt ? nt('uploadItemShow') : 'Show on map';
         const titleHide = nt ? nt('uploadItemHide') : 'Hide on map';
 
+        const esc = (s) =>
+            String(s ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+
         list.innerHTML = allItems.map(item => {
             const vis = item.visible !== false;
             const hiddenClass = vis ? '' : ' uploaded-item--hidden';
             return `
-            <div class="uploaded-item${hiddenClass}" data-id="${item.id}" data-visible="${vis}">
+            <div class="uploaded-item${hiddenClass}" data-id="${esc(item.id)}" data-visible="${vis}">
                 <div class="item-info">
                     <span class="item-icon">${item.type === 'architectural' ? '🏗️' : '📐'}</span>
                     <div class="item-details">
-                        <div class="item-name">${item.name}</div>
+                        <div class="item-name">${esc(item.name)}</div>
                         <div class="item-meta">${item.type === 'architectural' ? 'Architectural Model' : 'Vector Layer'} • ${new Date(item.uploadedAt).toLocaleDateString()}</div>
                     </div>
                 </div>

@@ -122,6 +122,99 @@ class DisplayControlUI {
         document.getElementById('tiltDownBtn')?.addEventListener('click', () => {
             this.tiltTileset('down');
         });
+
+        // Reset transform, export 4x4 matrix JSON, open Tileset JSON Editor, & Load Sample 3D Campus
+        document.getElementById('resetTilesetTransformBtn')?.addEventListener('click', () => {
+            const target = document.getElementById('targetSelector')?.value || 'selected';
+            const selectedId = document.getElementById('tilesetSelector')?.value;
+            if (!this.tilePositioning) this.tilePositioning = window.tilePositioning;
+            if (!this.tilePositioning) return;
+            if (target === 'all' || !selectedId) {
+                this.tilePositioning.resetAllTilesets();
+            } else {
+                this.tilePositioning.resetTileset(selectedId);
+            }
+            window.notification?.success?.('Reset tileset transform to original coordinates');
+        });
+
+        document.getElementById('exportTilesetTransformBtn')?.addEventListener('click', () => {
+            if (!this.tilePositioning) this.tilePositioning = window.tilePositioning;
+            const selectedId =
+                document.getElementById('tilesetSelector')?.value ||
+                window.tilesetViewer?.getAllTilesets?.()?.[0]?.id;
+            if (!selectedId || !this.tilePositioning?.exportTransformJson) {
+                window.notification?.warning?.('Load a tileset first to export its transform');
+                return;
+            }
+            const payload = this.tilePositioning.exportTransformJson(selectedId);
+            if (payload) {
+                window.fileEditor?.exportFile?.(
+                    JSON.stringify(payload, null, 2),
+                    `transform-${selectedId}.json`
+                );
+                window.notification?.success?.('Exported tileset transform JSON');
+            }
+        });
+
+        document.getElementById('openTilesetJsonEditorBtn')?.addEventListener('click', () => {
+            window.fileEditor?.showEditor?.();
+        });
+
+        document.getElementById('loadSampleTilesetBtn')?.addEventListener('click', () => {
+            void this.loadSampleTileset();
+        });
+
+        window.addEventListener('tilesetTransformChanged', (e) => {
+            const readout = document.getElementById('transformOffsetReadout');
+            const st = e.detail?.state;
+            if (readout && st) {
+                readout.textContent = `ΔE ${st.eastM.toFixed(1)} · ΔN ${st.northM.toFixed(1)} · ΔU ${st.upM.toFixed(1)} m · Hdg ${st.headingDeg.toFixed(0)}°`;
+            }
+        });
+
+        // Global helper + ?sample=1 URL hook
+        window.loadMeridianSampleTileset = () => this.loadSampleTileset();
+    }
+
+    /**
+     * Load the bundled Meridian Amsterdam Campus 3D Tiles 1.1 showcase
+     * (.b3dm buildings w/ batch tables, .i3dm instanced trees, .pnts point cloud, .cmpt composite).
+     */
+    async loadSampleTileset() {
+        const tv = window.tilesetViewer;
+        if (!tv || typeof tv.loadTileset !== 'function') {
+            window.notification?.warning?.('3D viewer is still initializing — please try again in a moment');
+            return null;
+        }
+        const sampleUrl = `${window.location.origin}/data/samples/meridian-campus/tileset.json`;
+        try {
+            window.app?.setTransientStatus?.('Loading Meridian Campus 3D Tiles sample…', 3500);
+            const loaded = await tv.loadTileset(sampleUrl, { fitToView: true });
+            try {
+                const resp = await fetch(sampleUrl);
+                if (resp.ok) {
+                    const json = await resp.json();
+                    window.metadataManager?.displayTilesetMetadata?.(
+                        'Meridian Campus (Amsterdam)',
+                        json
+                    );
+                    if (window.jsonTreeManager?.loadJSON) {
+                        window.jsonTreeManager.loadJSON(json);
+                    }
+                }
+            } catch (_) {
+                /* metadata preview optional */
+            }
+            this.refresh();
+            window.notification?.success?.(
+                'Loaded Meridian Campus 3D Tiles (.b3dm, .i3dm, .pnts, .cmpt)'
+            );
+            return loaded;
+        } catch (err) {
+            console.error('Sample tileset load error:', err);
+            window.notification?.error?.(`Failed to load sample tileset: ${err?.message || err}`);
+            return null;
+        }
     }
 
     /**

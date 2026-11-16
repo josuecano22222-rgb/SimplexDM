@@ -97,8 +97,15 @@
         },
     };
 
-    const NEAR_FAR_TRANSLUCENCY = new Cesium.NearFarScalar(5e4, 1.0, 8e6, 0.0);
-    const NEAR_FAR_SCALE = new Cesium.NearFarScalar(1e3, 1.2, 5e6, 0.5);
+    let _nearFarTranslucency = null;
+    let _nearFarScale = null;
+    function getNearFarScalars() {
+        if (!_nearFarTranslucency && typeof Cesium !== 'undefined' && Cesium.NearFarScalar) {
+            _nearFarTranslucency = new Cesium.NearFarScalar(5e4, 1.0, 8e6, 0.0);
+            _nearFarScale = new Cesium.NearFarScalar(1e3, 1.2, 5e6, 0.5);
+        }
+        return { translucency: _nearFarTranslucency, scale: _nearFarScale };
+    }
 
     const ENABLED_STORAGE_KEY = 'simplex.mapLabels.enabled';
 
@@ -178,9 +185,11 @@
             this._cameraListener = () => this._scheduleRefresh();
             viewer.camera.moveEnd.addEventListener(this._cameraListener);
 
-            this._loadRegionsFromManifest();
-            this._scheduleRefresh();
+            this._refreshSeq = 0;
             this._initialized = true;
+            this._loadRegionsFromManifest().finally(() => {
+                if (this._initialized) this._scheduleRefresh();
+            });
         }
 
         isInitialized() {
@@ -243,12 +252,14 @@
         async _doRefresh() {
             const api = this._labelsApi();
             if (!this.viewer || !api || !global.labelQueryService) return;
-            if (!this._globallyEnabled) {
+            if (!this._globallyEnabled || this._enabledTypes.size === 0) {
                 if (this.collection && !this.collection.isDestroyed()) {
                     this.collection.removeAll();
                 }
+                this.viewer?.scene?.requestRender?.();
                 return;
             }
+            const seq = (this._refreshSeq = (this._refreshSeq || 0) + 1);
             try {
                 const viewport = global.labelQueryService.getViewport(this.viewer);
                 if (!viewport) return;
@@ -259,6 +270,9 @@
                 };
 
                 const rows = await api.queryViewport(viewport, this._activeRegions, opts);
+                if (seq !== this._refreshSeq || !this._initialized || !this._globallyEnabled) {
+                    return;
+                }
                 const withNames = rows.map((row) => ({
                     row,
                     name: this._resolveName(row),
@@ -302,6 +316,7 @@
                     maxDist: styleDef.maxDist,
                 };
 
+                const scalars = getNearFarScalars();
                 this.collection.add({
                     position: Cesium.Cartesian3.fromDegrees(row.lon, row.lat),
                     text,
@@ -313,13 +328,14 @@
                     horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
                     verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
                     pixelOffset: new Cesium.Cartesian2(0, -6),
-                    scaleByDistance: NEAR_FAR_SCALE,
-                    translucencyByDistance: NEAR_FAR_TRANSLUCENCY,
+                    scaleByDistance: scalars.scale,
+                    translucencyByDistance: scalars.translucency,
                     disableDepthTestDistance: Number.POSITIVE_INFINITY,
                     distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, style.maxDist),
                     eyeOffset: new Cesium.Cartesian3(0, 0, -500),
                 });
             }
+            this.viewer?.scene?.requestRender?.();
         }
 
         /**

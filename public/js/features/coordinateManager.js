@@ -71,7 +71,10 @@ class CoordinateManager {
         const viewer = this.tilesetViewer.viewer;
         const canvas = viewer.scene.canvas;
 
-        // Track mouse position only (coordinate computation happens in postRender)
+        // Track mouse position and mark dirty (throttled ~20 Hz to eliminate idle GPU pickPosition reads)
+        this._mouseDirty = false;
+        this._lastPickMs = 0;
+        this._coordDisplayMode = this._coordDisplayMode || 'WGS84';
         this._mouseMoveListener = (event) => {
             const pos =
                 typeof window.cesiumPointerToCanvasPixels === 'function'
@@ -80,48 +83,63 @@ class CoordinateManager {
             if (!pos) return;
             if (pos.x < 0 || pos.y < 0 || pos.x > canvas.clientWidth || pos.y > canvas.clientHeight) return;
             this._lastMousePosition = pos;
+            this._mouseDirty = true;
+            viewer.scene?.requestRender?.();
         };
         canvas.addEventListener('mousemove', this._mouseMoveListener, { passive: true });
-        
-        // Also handle mouse leave to clear coordinates
-        canvas.addEventListener('mouseleave', () => {
-            // Optionally clear coordinates when mouse leaves canvas
-            // this.updateCoordinates(null, null, null);
-        });
 
-        // Bind coordinate update to scene.postRender for reliable per-frame updates
+        // Click status-bar CRS badge to cycle coordinate system (WGS84 -> UTM -> DMS -> EPSG:3857 -> ITM)
+        const coordsEl = document.getElementById('mouseCoordinates');
+        if (coordsEl && !coordsEl.dataset.crsCycleBound) {
+            coordsEl.dataset.crsCycleBound = '1';
+            coordsEl.addEventListener('click', (e) => {
+                if (e.target.closest('[data-cycle-crs]')) {
+                    this.cycleDisplayFormat();
+                } else if (e.target.closest('[data-copy-coords]')) {
+                    this.copyCurrentCoordinates();
+                }
+            });
+        }
+
+        // Bind coordinate update to scene.postRender (runs only when cursor moved >= 50 ms ago)
         if (!this._postRenderListener) {
             this._postRenderListener = () => {
-                if (!this._lastMousePosition) return;
+                if (!this._lastMousePosition || !this._mouseDirty) return;
+                const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+                if (now - this._lastPickMs < 50) return;
+                this._lastPickMs = now;
+                this._mouseDirty = false;
+
                 const scene = viewer.scene;
                 const camera = viewer.camera;
-
                 let cartesian = null;
+                let picked3D = false;
 
-                const noTerrain = viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider;
-                if (noTerrain) {
-                    cartesian = camera.pickEllipsoid(this._lastMousePosition, scene.globe.ellipsoid);
-                } else {
-                    if (scene.pickPositionSupported) {
+                const has3DTiles = (this.tilesetViewer?.tilesets?.size || 0) > 0;
+                const hasTerrain = !(viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider);
+
+                if ((has3DTiles || hasTerrain) && scene.pickPositionSupported) {
+                    try {
                         cartesian = scene.pickPosition(this._lastMousePosition);
-                    }
-                    if (!cartesian) {
-                        cartesian = camera.pickEllipsoid(this._lastMousePosition, scene.globe.ellipsoid);
+                        if (cartesian) picked3D = true;
+                    } catch (_) {
+                        cartesian = null;
                     }
                 }
-
+                if (!cartesian) {
+                    cartesian = camera.pickEllipsoid(this._lastMousePosition, scene.globe.ellipsoid);
+                }
                 if (!cartesian) return;
 
                 const carto = Cesium.Cartographic.fromCartesian(cartesian);
                 const lon = Cesium.Math.toDegrees(carto.longitude);
                 const lat = Cesium.Math.toDegrees(carto.latitude);
-                const elev = noTerrain ? 0.0 : (carto.height || 0.0);
+                const elev = picked3D ? (carto.height || 0.0) : 0.0;
                 const camAlt = camera.positionCartographic?.height ?? 0.0;
 
                 if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
-                this.updateCoordinates(lon, lat, elev);
                 this.currentCoordinates.cameraAlt = camAlt;
-                this.updateCoordinateDisplay();
+                this.updateCoordinates(lon, lat, elev);
             };
             viewer.scene.postRender.addEventListener(this._postRenderListener);
         }
@@ -139,11 +157,229 @@ class CoordinateManager {
         // Fallback keeps the old ITM approximation for legacy workflows.
         this.updateDerivedCrs(lon, lat, height);
 
-        // GEO is same as lon/lat
+        // GEO & high-precision UTM / DMS / Web Mercator
         this.currentCoordinates.geo = { lon, lat, height };
+        this.currentCoordinates.utm = CoordinateManager.wgs84ToUtm(lon, lat);
+        this.currentCoordinates.dms = CoordinateManager.toDms(lon, lat);
+        this.currentCoordinates.mercator = CoordinateManager.wgs84ToWebMercator(lon, lat);
 
         // Update display
         this.updateCoordinateDisplay();
+    }
+
+    /**
+     * Exact Snyder/Redfearn WGS84 -> UTM conversion (sub-millimeter precision, zones 1–60,
+     * including standard Norway 32V and Svalbard 31X/33X/35X/37X zone exceptions).
+     */
+    static wgs84ToUtm(lonDeg, latDeg) {
+        const lon = Number(lonDeg);
+        const lat = Number(latDeg);
+        if (!Number.isFinite(lon) || !Number.isFinite(lat) || lat < -80 || lat > 84) {
+            return null;
+        }
+        const a = 6378137.0;
+        const f = 1 / 298.257223563;
+        const k0 = 0.9996;
+        const e2 = f * (2 - f);
+        const ep2 = e2 / (1 - e2);
+
+        const normLon = ((lon + 180) % 360 + 360) % 360 - 180;
+        let zone = Math.floor((normLon + 180) / 6) + 1;
+        if (lat >= 56 && lat < 64 && normLon >= 3 && normLon < 12) {
+            zone = 32;
+        } else if (lat >= 72 && lat < 84) {
+            if (normLon >= 0 && normLon < 9) zone = 31;
+            else if (normLon >= 9 && normLon < 21) zone = 33;
+            else if (normLon >= 21 && normLon < 33) zone = 35;
+            else if (normLon >= 33 && normLon < 42) zone = 37;
+        }
+
+        const bands = 'CDEFGHJKLMNPQRSTUVWXX';
+        const bandIdx = Math.max(0, Math.min(bands.length - 1, Math.floor((lat + 80) / 8)));
+        const band = bands[bandIdx];
+        const hemisphere = lat >= 0 ? 'N' : 'S';
+
+        const deg2rad = Math.PI / 180;
+        const phi = lat * deg2rad;
+        const lam = normLon * deg2rad;
+        const lam0 = ((zone - 1) * 6 - 180 + 3) * deg2rad;
+
+        const sinPhi = Math.sin(phi);
+        const cosPhi = Math.cos(phi);
+        const tanPhi = Math.tan(phi);
+
+        const N = a / Math.sqrt(1 - e2 * sinPhi * sinPhi);
+        const T = tanPhi * tanPhi;
+        const C = ep2 * cosPhi * cosPhi;
+        const A = cosPhi * (lam - lam0);
+
+        const e4 = e2 * e2;
+        const e6 = e4 * e2;
+        const M =
+            a *
+            ((1 - e2 / 4 - (3 * e4) / 64 - (5 * e6) / 256) * phi -
+                ((3 * e2) / 8 + (3 * e4) / 32 + (45 * e6) / 1024) * Math.sin(2 * phi) +
+                ((15 * e4) / 256 + (45 * e6) / 1024) * Math.sin(4 * phi) -
+                ((35 * e6) / 3072) * Math.sin(6 * phi));
+
+        const A2 = A * A;
+        const A3 = A2 * A;
+        const A4 = A2 * A2;
+        const A5 = A4 * A;
+        const A6 = A3 * A3;
+
+        const easting =
+            k0 *
+                N *
+                (A +
+                    ((1 - T + C) * A3) / 6 +
+                    ((5 - 18 * T + T * T + 72 * C - 58 * ep2) * A5) / 120) +
+            500000.0;
+
+        let northing =
+            k0 *
+            (M +
+                N *
+                    tanPhi *
+                    (A2 / 2 +
+                        ((5 - T + 9 * C + 4 * C * C) * A4) / 24 +
+                        ((61 - 58 * T + T * T + 600 * C - 330 * ep2) * A6) / 720));
+        if (lat < 0) northing += 10000000.0;
+
+        const epsg = `EPSG:${(hemisphere === 'N' ? 32600 : 32700) + zone}`;
+        return {
+            zone,
+            band,
+            hemisphere,
+            easting: Number(easting.toFixed(2)),
+            northing: Number(northing.toFixed(2)),
+            epsg,
+            formatted: `${zone}${band} ${Math.round(easting)}E ${Math.round(northing)}N`,
+        };
+    }
+
+    /**
+     * Inverse UTM -> WGS84 (longitude, latitude in degrees).
+     */
+    static utmToWgs84(zone, hemisphereOrBand, easting, northing) {
+        const z = Number(zone);
+        const E = Number(easting);
+        const N0 = Number(northing);
+        if (!Number.isInteger(z) || z < 1 || z > 60 || !Number.isFinite(E) || !Number.isFinite(N0)) {
+            return null;
+        }
+        const hb = String(hemisphereOrBand || 'N').trim().toUpperCase();
+        const isSouth = hb === 'S' || (hb.length === 1 && hb >= 'C' && hb < 'N');
+
+        const a = 6378137.0;
+        const f = 1 / 298.257223563;
+        const k0 = 0.9996;
+        const e2 = f * (2 - f);
+        const ep2 = e2 / (1 - e2);
+        const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+
+        const x = E - 500000.0;
+        const y = isSouth ? N0 - 10000000.0 : N0;
+        const M = y / k0;
+        const e4 = e2 * e2;
+        const e6 = e4 * e2;
+        const mu = M / (a * (1 - e2 / 4 - (3 * e4) / 64 - (5 * e6) / 256));
+
+        const e1_2 = e1 * e1;
+        const e1_3 = e1_2 * e1;
+        const e1_4 = e1_2 * e1_2;
+        const phi1 =
+            mu +
+            ((3 * e1) / 2 - (27 * e1_3) / 32) * Math.sin(2 * mu) +
+            ((21 * e1_2) / 16 - (55 * e1_4) / 32) * Math.sin(4 * mu) +
+            ((151 * e1_3) / 96) * Math.sin(6 * mu) +
+            ((1097 * e1_4) / 512) * Math.sin(8 * mu);
+
+        const sin1 = Math.sin(phi1);
+        const cos1 = Math.cos(phi1);
+        const tan1 = Math.tan(phi1);
+        const N1 = a / Math.sqrt(1 - e2 * sin1 * sin1);
+        const T1 = tan1 * tan1;
+        const C1 = ep2 * cos1 * cos1;
+        const R1 = (a * (1 - e2)) / Math.pow(1 - e2 * sin1 * sin1, 1.5);
+        const D = x / (N1 * k0);
+        const D2 = D * D;
+        const D4 = D2 * D2;
+
+        const latRad =
+            phi1 -
+            ((N1 * tan1) / R1) *
+                (D2 / 2 -
+                    ((5 + 3 * T1 + 10 * C1 - 4 * C1 * C1 - 9 * ep2) * D4) / 24 +
+                    ((61 + 90 * T1 + 298 * C1 + 45 * T1 * T1 - 252 * ep2 - 3 * C1 * C1) *
+                        D4 *
+                        D2) /
+                        720);
+        const lon0 = (((z - 1) * 6 - 180 + 3) * Math.PI) / 180;
+        const lonRad =
+            lon0 +
+            (D -
+                ((1 + 2 * T1 + C1) * D2 * D) / 6 +
+                ((5 - 2 * C1 + 28 * T1 - 3 * C1 * C1 + 8 * ep2 + 24 * T1 * T1) * D4 * D) / 120) /
+                cos1;
+
+        const rad2deg = 180 / Math.PI;
+        return {
+            lon: Number((lonRad * rad2deg).toFixed(7)),
+            lat: Number((latRad * rad2deg).toFixed(7)),
+        };
+    }
+
+    /**
+     * Format WGS84 degrees as Degrees-Minutes-Seconds (DMS).
+     */
+    static toDms(lonDeg, latDeg) {
+        const fmt = (deg, posH, negH) => {
+            const h = deg >= 0 ? posH : negH;
+            const abs = Math.abs(Number(deg) || 0);
+            const d = Math.floor(abs);
+            const mFull = (abs - d) * 60;
+            const m = Math.floor(mFull);
+            const s = ((mFull - m) * 60).toFixed(2);
+            return `${d}°${String(m).padStart(2, '0')}′${String(s).padStart(5, '0')}″${h}`;
+        };
+        const latStr = fmt(latDeg, 'N', 'S');
+        const lonStr = fmt(lonDeg, 'E', 'W');
+        return { lat: latStr, lon: lonStr, formatted: `${latStr} ${lonStr}` };
+    }
+
+    /**
+     * Web Mercator (EPSG:3857) projection in meters.
+     */
+    static wgs84ToWebMercator(lonDeg, latDeg) {
+        const R = 6378137.0;
+        const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, Number(latDeg) || 0));
+        const x = (R * (Number(lonDeg) || 0) * Math.PI) / 180;
+        const y = R * Math.log(Math.tan(Math.PI / 4 + (clampedLat * Math.PI) / 360));
+        return { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) };
+    }
+
+    cycleDisplayFormat() {
+        const order = ['WGS84', 'UTM', 'DMS', 'EPSG:3857', 'ITM'];
+        const cur = order.indexOf(this._coordDisplayMode || 'WGS84');
+        this._coordDisplayMode = order[(cur + 1) % order.length];
+        this.updateCoordinateDisplay();
+        return this._coordDisplayMode;
+    }
+
+    copyCurrentCoordinates() {
+        const { lon, lat, height, utm, dms } = this.currentCoordinates;
+        if (lon === null || lat === null) return false;
+        let text = `${lat.toFixed(6)}, ${lon.toFixed(6)}, ${(height || 0).toFixed(2)}m`;
+        if (this._coordDisplayMode === 'UTM' && utm) {
+            text = `${utm.zone}${utm.band} ${utm.easting.toFixed(2)}E ${utm.northing.toFixed(2)}N`;
+        } else if (this._coordDisplayMode === 'DMS' && dms) {
+            text = dms.formatted;
+        }
+        navigator?.clipboard?.writeText?.(text)?.then(() => {
+            window.notification?.success?.(`Copied: ${text}`);
+        }).catch(() => {});
+        return text;
     }
 
     /**
@@ -243,16 +479,44 @@ class CoordinateManager {
             const camTitle =
                 'Camera altitude above the WGS84 ellipsoid. Large values mean the view is far from Earth (zoomed out).';
 
-            const grid =
-                `<div class="status-coord-head">` +
-                `<span class="status-crs-badge">WGS84</span>` +
-                `<span class="status-coord-head-hint">ellipsoid</span>` +
-                `</div>` +
-                `<div class="status-coord-grid" role="group" aria-label="Cursor WGS84">` +
+            const utm = this.currentCoordinates.utm || CoordinateManager.wgs84ToUtm(lon, lat);
+            const dms = this.currentCoordinates.dms || CoordinateManager.toDms(lon, lat);
+            const merc = this.currentCoordinates.mercator || CoordinateManager.wgs84ToWebMercator(lon, lat);
+            const mode = this._coordDisplayMode || 'WGS84';
+
+            let primaryRows =
                 `<span class="status-coord-dt">Latitude</span>` +
                 `<span class="status-coord-dd" title="Geodetic latitude (°)">${latAbs.toFixed(5)}° ${latDir}</span>` +
                 `<span class="status-coord-dt">Longitude</span>` +
-                `<span class="status-coord-dd" title="Geodetic longitude (°)">${lonAbs.toFixed(5)}° ${lonDir}</span>` +
+                `<span class="status-coord-dd" title="Geodetic longitude (°)">${lonAbs.toFixed(5)}° ${lonDir}</span>`;
+
+            if (mode === 'UTM' && utm) {
+                primaryRows =
+                    `<span class="status-coord-dt">Zone ${utm.zone}${utm.band}</span>` +
+                    `<span class="status-coord-dd">${utm.epsg}</span>` +
+                    `<span class="status-coord-dt">E / N</span>` +
+                    `<span class="status-coord-dd">${utm.easting.toFixed(1)} · ${utm.northing.toFixed(1)}</span>`;
+            } else if (mode === 'DMS' && dms) {
+                primaryRows =
+                    `<span class="status-coord-dt">Lat DMS</span>` +
+                    `<span class="status-coord-dd">${dms.lat}</span>` +
+                    `<span class="status-coord-dt">Lon DMS</span>` +
+                    `<span class="status-coord-dd">${dms.lon}</span>`;
+            } else if (mode === 'EPSG:3857' && merc) {
+                primaryRows =
+                    `<span class="status-coord-dt">X (m)</span>` +
+                    `<span class="status-coord-dd">${merc.x.toFixed(1)}</span>` +
+                    `<span class="status-coord-dt">Y (m)</span>` +
+                    `<span class="status-coord-dd">${merc.y.toFixed(1)}</span>`;
+            }
+
+            const grid =
+                `<div class="status-coord-head">` +
+                `<button type="button" class="status-crs-badge" data-cycle-crs="1" title="Click to switch coordinate system (WGS84 / UTM / DMS / EPSG:3857 / ITM)">${mode}</button>` +
+                `<span class="status-coord-head-hint">${utm ? `UTM ${utm.zone}${utm.band}` : 'ellipsoid'}</span>` +
+                `</div>` +
+                `<div class="status-coord-grid" role="group" aria-label="Cursor coordinates" data-copy-coords="1" title="Click coordinates to copy">` +
+                primaryRows +
                 `<span class="status-coord-dt">Surface</span>` +
                 `<span class="status-coord-dd" title="${surfaceTitle}">${simplexFormatDistanceMeters(height)}</span>` +
                 `<span class="status-coord-dt">Camera Δh</span>` +
@@ -260,18 +524,19 @@ class CoordinateManager {
                 `</div>`;
 
             const itm = this.currentCoordinates.itm;
-            const crsRaw = window.simplexProjectCRS || this.currentCoordinates.displayCrs;
-            const crsSafe = String(crsRaw || '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
+            const crsRaw = mode === 'ITM' ? 'EPSG:2039' : window.simplexProjectCRS;
             const localLine =
-                crsRaw && itm && Number.isFinite(itm.east) && Number.isFinite(itm.north)
-                    ? `<div class="status-coord-local" title="Project CRS easting / northing">` +
-                      `<span class="status-coord-local-label">${crsSafe}</span>` +
-                      `<span class="status-coord-local-val">E ${itm.east.toFixed(2)} m · N ${itm.north.toFixed(2)} m</span>` +
+                mode === 'WGS84' && utm
+                    ? `<div class="status-coord-local" title="WGS84 UTM Easting / Northing">` +
+                      `<span class="status-coord-local-label">UTM ${utm.zone}${utm.band}</span>` +
+                      `<span class="status-coord-local-val">E ${Math.round(utm.easting)} · N ${Math.round(utm.northing)} m</span>` +
                       `</div>`
-                    : '';
+                    : crsRaw && itm && Number.isFinite(itm.east) && Number.isFinite(itm.north)
+                      ? `<div class="status-coord-local" title="Project CRS easting / northing">` +
+                        `<span class="status-coord-local-label">${String(crsRaw).replace(/[<>&]/g, '')}</span>` +
+                        `<span class="status-coord-local-val">E ${itm.east.toFixed(2)} m · N ${itm.north.toFixed(2)} m</span>` +
+                        `</div>`
+                      : '';
 
             coords.innerHTML = `<div class="status-coord-block">${grid}${localLine}</div>`;
             coords.removeAttribute('title');
@@ -750,7 +1015,10 @@ class CoordinateManager {
     }
 }
 
-// Initialize when available
 if (typeof window !== 'undefined') {
+    window.CoordinateManager = CoordinateManager;
     window.coordinateManager = new CoordinateManager();
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { CoordinateManager };
 }

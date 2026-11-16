@@ -1,18 +1,56 @@
 {
   "appId": "com.meridian.viewer",
   "productName": "SimplexDM",
+  "copyright": "Copyright © 2026",
   "directories": {
-    "output": "dist"
+    "output": "dist",
+    "buildResources": "build"
   },
   "files": [
     "electron-main.js",
+    "main/**/*",
     "preload.js",
-    "public/**/*",
+    "public-bundled/**/*",
     "server/**/*",
     "scripts/**/*",
-    "package.json"
+    "data/**/*",
+    "package.json",
+    "!public/**/*",
+    "!webpack-entry.js",
+    "!data/tiles/raster/**/*",
+    "!data/tiles/raster.zip",
+    "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+    "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+    "!**/node_modules/*.d.ts",
+    "!**/node_modules/.bin",
+    "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+    "!.editorconfig",
+    "!**/._*",
+    "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+    "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+    "!**/{appveyor.yml,.travis.yml,circle.yml}",
+    "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
+  ],
+  "asar": true,
+  "asarUnpack": [
+    "server/**/*",
+    "main/gis/workers/**/*",
+    "node_modules/better-sqlite3/**/*",
+    "node_modules/jsts/dist/**/*"
+  ],
+  "extraFiles": [
+    {
+      "from": "data",
+      "to": "data",
+      "filter": [
+        "**/*",
+        "!tiles/raster/**/*",
+        "!tiles/raster.zip"
+      ]
+    }
   ],
   "win": {
+    "icon": "build/icon.ico",
     "target": [
       {
         "target": "nsis",
@@ -22,16 +60,34 @@
         "target": "portable",
         "arch": ["x64"]
       }
-    ]
+    ],
+    "requestedExecutionLevel": "asInvoker"
   },
   "mac": {
-    "target": ["dmg", "zip"]
+    "icon": "build/icon.icns",
+    "target": ["dmg", "zip"],
+    "category": "public.app-category.utilities"
   },
   "linux": {
-    "target": ["AppImage", "deb", "rpm"]
+    "icon": "build/icon.png",
+    "target": ["AppImage", "deb", "rpm"],
+    "category": "Utility"
   },
   "nsis": {
     "oneClick": false,
-    "allowToChangeInstallationDirectory": true
+    "allowToChangeInstallationDirectory": true,
+    "allowElevation": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "SimplexDM",
+    "include": "build/installer.nsh",
+    "deleteAppDataOnUninstall": false,
+    "runAfterFinish": true,
+    "menuCategory": false,
+    "artifactName": "${productName}-${version}-Setup.${ext}",
+    "warningsAsErrors": false
+  },
+  "portable": {
+    "artifactName": "${productName}-${version}-Portable.${ext}"
   }
 }

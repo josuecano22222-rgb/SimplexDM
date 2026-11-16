@@ -102,6 +102,11 @@ class EditingManager {
         }, true);
 
         window.addEventListener('keydown', (e) => {
+            const target = e.target || document.activeElement;
+            const tag = (target?.tagName || '').toUpperCase();
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) {
+                return;
+            }
             if (e.key === 'Delete') {
                 this.deleteSelected().catch(() => {});
             }

@@ -6,13 +6,77 @@
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#060810">
   <title>Meridian — The 3D Reality Planning Platform</title>
+  <link rel="icon" type="image/svg+xml" href="assets/meridian-icon.svg">
   <script src="js/simplexThemeSync.js"></script>
   <script>
     if (window.simplexThemeSync) window.simplexThemeSync(null);
   </script>
+  <link rel="stylesheet" href="lib/fontawesome/css/all.min.css">
   <link rel="stylesheet" href="css/landing.css">
+  <style>
+    .landing-skip-link {
+      position: fixed; top: -100px; inset-inline-start: 16px; z-index: 9999;
+      padding: 10px 16px; border-radius: 6px; background: var(--cyan); color: #04101c;
+      font-weight: 700; font-size: 13px; text-decoration: none;
+    }
+    .landing-skip-link:focus { top: 12px; outline: 2px solid #fff; outline-offset: 2px; }
+    .ws-modal-backdrop {
+      position: fixed; inset: 0; z-index: 9000; display: none;
+      align-items: center; justify-content: center; padding: 16px;
+      background: rgba(6, 8, 16, 0.82); backdrop-filter: blur(12px);
+    }
+    .ws-modal-backdrop.is-open { display: flex; }
+    .ws-modal-card {
+      width: min(460px, 100%); background: var(--surface); color: var(--ink-1);
+      border: 1px solid var(--line-cyan); border-radius: 14px; padding: 24px;
+      box-shadow: var(--shadow);
+    }
+    .ws-modal-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px;
+    }
+    .ws-modal-head h2 { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
+    .ws-modal-head h2 i { color: var(--cyan); }
+    .ws-modal-close {
+      background: transparent; border: 1px solid var(--line-mid); color: var(--ink-1);
+      width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 16px;
+    }
+    .ws-modal-desc { color: var(--ink-2); font-size: 13px; line-height: 1.55; margin: 0 0 16px; }
+    .ws-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .ws-field label { font-size: 11.5px; color: var(--ink-2); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+    .ws-field input {
+      padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line-mid);
+      background: var(--base); color: var(--ink-1); font-size: 13.5px;
+    }
+    .ws-field input:focus-visible, .ws-modal-close:focus-visible, .ws-btn:focus-visible {
+      outline: 2px solid var(--cyan); outline-offset: 2px;
+    }
+    .ws-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .ws-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+      text-decoration: none; cursor: pointer; border: 1px solid var(--line-mid);
+      background: var(--raised); color: var(--ink-1); transition: border-color 160ms ease, background 160ms ease;
+    }
+    .ws-btn:hover { border-color: var(--cyan); }
+    .ws-btn-primary {
+      grid-column: 1 / -1; background: var(--cyan); border-color: var(--cyan); color: #04101c; font-weight: 700;
+    }
+    .ws-btn-primary:hover { background: var(--cyan-hi); }
+    .ws-status { margin-top: 12px; font-family: var(--f-data); font-size: 11.5px; color: var(--green); min-height: 16px; }
+    @media (max-width: 680px) {
+      .navbar-container { padding-inline: 14px; gap: 8px; flex-wrap: wrap; }
+      .navbar-right { gap: 8px; flex-wrap: wrap; }
+      .admin-link { display: none; }
+      .ws-actions { grid-template-columns: 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+      .reveal { opacity: 1 !important; transform: none !important; }
+    }
+  </style>
 </head>
 <body>
+  <a href="#main-content" class="landing-skip-link">Skip to main content</a>
   <script>
     if (window.simplexThemeSync) window.simplexThemeSync(document.body);
   </script>
@@ -37,15 +101,15 @@
 
       <div class="navbar-right">
         <div class="language-selector">
-          <span class="lang-icon">🌐</span>
-          <select class="lang-select" aria-label="Select language">
+          <span class="lang-icon" aria-hidden="true"><i class="fas fa-globe"></i></span>
+          <select class="lang-select" id="landingLangSelect" aria-label="Select language">
             <option value="en">English</option>
-            <option value="he">עברית (Hebrew)</option>
+            <option value="ar">العربية (Arabic)</option>
           </select>
         </div>
         <a href="admin.html" class="admin-link" id="adminLink">Edit content</a>
-        <a href="#" class="nav-link" id="signInBtn">Sign In</a>
-        <a href="#demo" class="btn-primary-nav" id="bookDemoBtn">Book a demo</a>
+        <button type="button" class="nav-link" id="signInBtn" style="background:none;border:0;cursor:pointer;font:inherit;">Workspace</button>
+        <a href="index.html?sample=1" class="btn-primary-nav" id="bookDemoBtn">Launch 3D Demo</a>
       </div>
     </div>
   </nav>
@@ -53,7 +117,7 @@
   <!-- ══════════════════════════════════
        HERO SECTION
   ══════════════════════════════════ -->
-  <section class="hero-section">
+  <section class="hero-section" id="main-content">
     <div class="hero-content">
       <div class="hero-eyebrow">
         <span class="hero-eyebrow-dot"></span>
@@ -454,21 +518,49 @@
         <span class="footer-brand-name">Meridian</span>
       </a>
 
-      <span class="footer-meta">© 2025 Meridian. All rights reserved.</span>
+      <span class="footer-meta">© 2026 Meridian · SimplexDM v2.0.0. MIT License.</span>
 
       <div class="footer-links">
         <a href="admin.html">Admin</a>
-        <a href="#demo">Demo</a>
-        <a href="index.html">Platform</a>
+        <a href="index.html?sample=1">Sample 3D</a>
+        <a href="index.html">Workstation</a>
       </div>
     </div>
   </footer>
 
+  <!-- Local Workstation Profile & Quick Launch Modal -->
+  <div class="ws-modal-backdrop" id="workspaceModal" role="dialog" aria-modal="true" aria-labelledby="workspaceModalTitle">
+    <div class="ws-modal-card">
+      <div class="ws-modal-head">
+        <h2 id="workspaceModalTitle"><i class="fas fa-user-astronaut" aria-hidden="true"></i><span>Operator Workspace</span></h2>
+        <button type="button" class="ws-modal-close" id="workspaceModalClose" aria-label="Close dialog">×</button>
+      </div>
+      <p class="ws-modal-desc">
+        Meridian operates 100% locally with zero cloud account required. Set your operator profile for team collaboration sessions, bookmarks, and GIS project exports.
+      </p>
+      <div class="ws-field">
+        <label for="wsOperatorInput">Operator Display Name</label>
+        <input type="text" id="wsOperatorInput" maxlength="64" placeholder="e.g. Lead GIS Analyst" autocomplete="name">
+      </div>
+      <div class="ws-actions">
+        <button type="button" class="ws-btn ws-btn-primary" id="wsSaveAndOpenBtn">
+          <i class="fas fa-cube" aria-hidden="true"></i><span>Save &amp; Open 3D Workstation</span>
+        </button>
+        <a href="index.html?sample=1" class="ws-btn" id="wsOpenSampleBtn">
+          <i class="fas fa-city" aria-hidden="true"></i><span>Sample 3D Campus</span>
+        </a>
+        <a href="admin.html" class="ws-btn">
+          <i class="fas fa-sliders-h" aria-hidden="true"></i><span>Content Studio</span>
+        </a>
+      </div>
+      <div class="ws-status" id="wsModalStatus" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+
   <!-- ══════════════════════════════════
-       SCRIPTS (preserving all original handlers)
+       SCRIPTS
   ══════════════════════════════════ -->
   <script>
-    // Original navigation handlers — preserved exactly
     document.getElementById('startCreatingBtn')?.addEventListener('click', (e) => {
       e.preventDefault();
       window.location.href = 'index.html';
@@ -479,27 +571,104 @@
       window.location.href = 'index.html';
     });
 
-    document.getElementById('bookDemoBtn')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      document.querySelector('.platform-demo-section')?.scrollIntoView({ behavior: 'smooth' });
-    });
+    // Operator Workspace Modal
+    const wsModal = document.getElementById('workspaceModal');
+    const wsInput = document.getElementById('wsOperatorInput');
+    const wsStatus = document.getElementById('wsModalStatus');
+    const openWsModal = () => {
+      if (!wsModal) return;
+      try {
+        wsInput.value = localStorage.getItem('simplex_collab_author') || '';
+      } catch (_) {}
+      wsStatus.textContent = '';
+      wsModal.classList.add('is-open');
+      wsInput?.focus();
+    };
+    const closeWsModal = () => wsModal?.classList.remove('is-open');
 
     document.getElementById('signInBtn')?.addEventListener('click', (e) => {
       e.preventDefault();
-      alert('Sign In functionality — to be implemented');
+      openWsModal();
+    });
+    document.getElementById('workspaceModalClose')?.addEventListener('click', closeWsModal);
+    wsModal?.addEventListener('click', (e) => { if (e.target === wsModal) closeWsModal(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && wsModal?.classList.contains('is-open')) closeWsModal();
+    });
+    document.getElementById('wsSaveAndOpenBtn')?.addEventListener('click', () => {
+      const name = (wsInput?.value || '').trim();
+      try {
+        if (name) localStorage.setItem('simplex_collab_author', name);
+      } catch (_) {}
+      wsStatus.textContent = name ? `Saved operator profile: ${name}` : 'Opening workstation…';
+      window.location.href = 'index.html';
     });
 
-    // Intersection Observer for reveal animations
-    const revealObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-          revealObserver.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    // Bidirectional English / Arabic locale selector (shared with 3D workstation)
+    const landingI18n = {
+      en: {
+        dir: 'ltr',
+        workspace: 'Workspace',
+        edit: 'Edit content',
+        demo: 'Launch 3D Demo',
+        start: 'Start Creating',
+        seeAction: 'See it in action'
+      },
+      ar: {
+        dir: 'rtl',
+        workspace: 'مساحة العمل',
+        edit: 'تحرير المحتوى',
+        demo: 'تشغيل العرض ثلاثي الأبعاد',
+        start: 'ابدأ الإنشاء',
+        seeAction: 'استعراض المنصة'
+      }
+    };
+    const langSel = document.getElementById('landingLangSelect');
+    const applyLandingLocale = (code) => {
+      const lang = code === 'ar' ? 'ar' : 'en';
+      const dict = landingI18n[lang];
+      document.documentElement.lang = lang;
+      document.documentElement.dir = dict.dir;
+      if (langSel) langSel.value = lang;
+      const wsBtn = document.getElementById('signInBtn');
+      const edBtn = document.getElementById('adminLink');
+      const dmBtn = document.getElementById('bookDemoBtn');
+      const sc1 = document.getElementById('startCreatingBtn');
+      const sc2 = document.getElementById('startCreatingBtn2');
+      if (wsBtn) wsBtn.textContent = dict.workspace;
+      if (edBtn) edBtn.textContent = dict.edit;
+      if (dmBtn) dmBtn.textContent = dict.demo;
+      if (sc1) sc1.innerHTML = `${dict.start} <span class="btn-hero-arrow">${lang === 'ar' ? '←' : '→'}</span>`;
+      if (sc2) sc2.innerHTML = `${dict.start} <span class="btn-hero-arrow">${lang === 'ar' ? '←' : '→'}</span>`;
+    };
+    try {
+      const saved = localStorage.getItem('simplex.uiLocale') || localStorage.getItem('simplex_ui_locale') || 'en';
+      applyLandingLocale(saved);
+    } catch (_) {}
+    langSel?.addEventListener('change', (e) => {
+      const next = e.target.value === 'ar' ? 'ar' : 'en';
+      try {
+        localStorage.setItem('simplex.uiLocale', next);
+        localStorage.setItem('simplex_ui_locale', next);
+      } catch (_) {}
+      applyLandingLocale(next);
+    });
 
-    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+    // Intersection Observer for reveal animations (respects prefers-reduced-motion)
+    const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced || typeof IntersectionObserver === 'undefined') {
+      document.querySelectorAll('.reveal').forEach(el => el.classList.add('visible'));
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+      document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+    }
   </script>
 
   <script src="js/siteContentClient.js"></script>

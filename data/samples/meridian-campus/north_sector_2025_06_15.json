@@ -1,0 +1,64 @@
+{
+  "asset": {
+    "version": "1.0",
+    "tilesetVersion": "2025.06.15",
+    "gltfUpAxis": "Y",
+    "extras": {
+      "name": "Meridian Campus — North Sector (2025 Survey)",
+      "surveyDate": "2025-06-15",
+      "crs": "EPSG:4978 (WGS84 ECEF)",
+      "gsdCm": 3,
+      "buildings": 4
+    }
+  },
+  "properties": {
+    "height_m": {
+      "minimum": 19,
+      "maximum": 62.5
+    },
+    "floors": {
+      "minimum": 4,
+      "maximum": 16
+    },
+    "year_built": {
+      "minimum": 2019,
+      "maximum": 2025
+    }
+  },
+  "geometricError": 64,
+  "root": {
+    "transform": [
+      -0.085488,
+      0.996339,
+      0,
+      0,
+      -0.789045,
+      -0.067702,
+      0.610593,
+      0,
+      0.608358,
+      0.052199,
+      0.791944,
+      0,
+      3888360.886994,
+      333630.410966,
+      5027882.274791,
+      1
+    ],
+    "boundingVolume": {
+      "region": [
+        0.08557349,
+        0.91398879,
+        0.08561189,
+        0.91400449,
+        0,
+        68
+      ]
+    },
+    "geometricError": 0,
+    "refine": "ADD",
+    "content": {
+      "uri": "north_buildings.b3dm"
+    }
+  }
+}

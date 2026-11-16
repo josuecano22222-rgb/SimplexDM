@@ -1,7 +1,22 @@
 /**
  * TilesetDatabase
- * Tileset metadata database using IndexedDB
+ * Tileset metadata database backed by IndexedDB (with in-memory fallback when IndexedDB is unavailable).
  */
+
+function idbRequestToPromise(request) {
+    return new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error('IndexedDB request failed'));
+    });
+}
+
+function idbTransactionComplete(tx) {
+    return new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error || new Error('IndexedDB transaction failed'));
+        tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted'));
+    });
+}
 
 class TilesetDatabase {
     constructor() {
@@ -9,30 +24,39 @@ class TilesetDatabase {
         this.dbName = 'tileset_database';
         this.dbVersion = 1;
         this.storeName = 'tilesets';
+        this._memoryFallback = new Map();
+        this._initPromise = null;
         this.init();
     }
 
-    /**
-     * Initialize IndexedDB
-     */
     async init() {
-        try {
-            this.db = await this.openDB();
-        } catch (error) {
-            console.error('Failed to initialize TilesetDatabase:', error);
+        if (this.db) return this.db;
+        if (this._initPromise) return this._initPromise;
+        if (typeof indexedDB === 'undefined') {
+            return null;
         }
+        this._initPromise = this.openDB()
+            .then((db) => {
+                this.db = db;
+                return db;
+            })
+            .catch((error) => {
+                console.warn('TilesetDatabase falling back to in-memory store:', error?.message || error);
+                return null;
+            })
+            .finally(() => {
+                this._initPromise = null;
+            });
+        return this._initPromise;
     }
 
-    /**
-     * Open IndexedDB database
-     */
     openDB() {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(this.dbName, this.dbVersion);
-            
+
             request.onerror = () => reject(request.error);
             request.onsuccess = () => resolve(request.result);
-            
+
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
                 if (!db.objectStoreNames.contains(this.storeName)) {
@@ -43,119 +67,131 @@ class TilesetDatabase {
         });
     }
 
-    /**
-     * Store tileset metadata
-     */
-    async storeTileset(url, tilesetJson) {
-        if (!this.db) return;
+    async storeTileset(url, tilesetJson = {}) {
+        if (!url) throw new Error('Tileset URL is required');
+        const metadata = {
+            url,
+            timestamp: Date.now(),
+            geometricError: tilesetJson.geometricError ?? tilesetJson.root?.geometricError ?? null,
+            root: tilesetJson.root || null,
+            asset: tilesetJson.asset || { version: '1.0' },
+            tileCount: this.countTiles(tilesetJson),
+            nestedTilesets: this.findNestedTilesets(tilesetJson).length,
+        };
+
+        await this.init();
+        if (!this.db) {
+            this._memoryFallback.set(url, metadata);
+            return metadata;
+        }
 
         try {
-            const metadata = {
-                url: url,
-                timestamp: Date.now(),
-                geometricError: tilesetJson.geometricError,
-                root: tilesetJson.root,
-                asset: tilesetJson.asset,
-                tileCount: this.countTiles(tilesetJson),
-                nestedTilesets: this.findNestedTilesets(tilesetJson).length
-            };
-
             const tx = this.db.transaction([this.storeName], 'readwrite');
             const store = tx.objectStore(this.storeName);
-            await store.put(metadata);
+            store.put(metadata);
+            await idbTransactionComplete(tx);
             return metadata;
         } catch (error) {
             console.error('Failed to store tileset:', error);
-            throw error;
+            this._memoryFallback.set(url, metadata);
+            return metadata;
         }
     }
 
-    /**
-     * Get tileset metadata
-     */
     async getTileset(url) {
-        if (!this.db) return null;
+        if (!url) return null;
+        await this.init();
+        if (!this.db) {
+            return this._memoryFallback.get(url) || null;
+        }
 
         try {
             const tx = this.db.transaction([this.storeName], 'readonly');
             const store = tx.objectStore(this.storeName);
-            const request = store.get(url);
-            return await request;
+            const result = await idbRequestToPromise(store.get(url));
+            return result || null;
         } catch (error) {
             console.error('Failed to get tileset:', error);
-            return null;
+            return this._memoryFallback.get(url) || null;
         }
     }
 
-    /**
-     * Get all tilesets
-     */
     async getAllTilesets() {
-        if (!this.db) return [];
+        await this.init();
+        if (!this.db) {
+            return Array.from(this._memoryFallback.values());
+        }
 
         try {
             const tx = this.db.transaction([this.storeName], 'readonly');
             const store = tx.objectStore(this.storeName);
-            const request = store.getAll();
-            return await request;
+            const list = await idbRequestToPromise(store.getAll());
+            return Array.isArray(list) ? list : [];
         } catch (error) {
             console.error('Failed to get all tilesets:', error);
-            return [];
+            return Array.from(this._memoryFallback.values());
         }
     }
 
-    /**
-     * Count tiles in tileset
-     */
-    countTiles(tilesetJson) {
-        let count = 0;
-        
-        const traverse = (tile) => {
-            count++;
-            if (tile.children) {
-                tile.children.forEach(child => traverse(child));
-            }
-        };
-        
-        if (tilesetJson.root) {
-            traverse(tilesetJson.root);
-        }
-        
-        return count;
-    }
-
-    /**
-     * Find nested tilesets
-     */
-    findNestedTilesets(tilesetJson) {
-        const nested = [];
-        
-        const traverse = (tile) => {
-            if (tile.content && tile.content.uri && tile.content.uri.endsWith('.json')) {
-                nested.push(tile.content.uri);
-            }
-            if (tile.children) {
-                tile.children.forEach(child => traverse(child));
-            }
-        };
-        
-        if (tilesetJson.root) {
-            traverse(tilesetJson.root);
-        }
-        
-        return nested;
-    }
-
-    /**
-     * Clear database
-     */
-    async clearDatabase() {
-        if (!this.db) return;
+    async deleteTileset(url) {
+        if (!url) return false;
+        this._memoryFallback.delete(url);
+        await this.init();
+        if (!this.db) return true;
 
         try {
             const tx = this.db.transaction([this.storeName], 'readwrite');
-            const store = tx.objectStore(this.storeName);
-            await store.clear();
+            tx.objectStore(this.storeName).delete(url);
+            await idbTransactionComplete(tx);
+            return true;
+        } catch (error) {
+            console.error('Failed to delete tileset:', error);
+            return false;
+        }
+    }
+
+    countTiles(tilesetJson) {
+        if (!tilesetJson || !tilesetJson.root) return 0;
+        let count = 0;
+        const traverse = (tile) => {
+            if (!tile) return;
+            count++;
+            if (Array.isArray(tile.children)) {
+                tile.children.forEach(traverse);
+            }
+        };
+        traverse(tilesetJson.root);
+        return count;
+    }
+
+    findNestedTilesets(tilesetJson) {
+        if (!tilesetJson || !tilesetJson.root) return [];
+        const nested = [];
+        const checkContent = (content) => {
+            const uri = content?.uri || content?.url;
+            if (typeof uri === 'string' && uri.split('?')[0].toLowerCase().endsWith('.json')) {
+                nested.push(uri);
+            }
+        };
+        const traverse = (tile) => {
+            if (!tile) return;
+            if (tile.content) checkContent(tile.content);
+            if (Array.isArray(tile.contents)) tile.contents.forEach(checkContent);
+            if (Array.isArray(tile.children)) tile.children.forEach(traverse);
+        };
+        traverse(tilesetJson.root);
+        return nested;
+    }
+
+    async clearDatabase() {
+        this._memoryFallback.clear();
+        await this.init();
+        if (!this.db) return true;
+
+        try {
+            const tx = this.db.transaction([this.storeName], 'readwrite');
+            tx.objectStore(this.storeName).clear();
+            await idbTransactionComplete(tx);
             return true;
         } catch (error) {
             console.error('Failed to clear database:', error);
@@ -164,5 +200,5 @@ class TilesetDatabase {
     }
 }
 
-// Export singleton instance
+window.TilesetDatabase = TilesetDatabase;
 window.tilesetDatabase = new TilesetDatabase();

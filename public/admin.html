@@ -3,16 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:* http://127.0.0.1:* data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' http://localhost:* http://127.0.0.1:* data: blob:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:* http://127.0.0.1:* data: blob:; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' http://localhost:* http://127.0.0.1:* data: blob:; connect-src 'self' http://localhost:* http://127.0.0.1:* data: blob:;">
   <title>Meridian — Site Content Admin</title>
+  <link rel="icon" type="image/svg+xml" href="assets/meridian-icon.svg">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#060810">
   <script src="js/simplexThemeSync.js"></script>
   <script>
     if (window.simplexThemeSync) window.simplexThemeSync(null);
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
     :root {
       --void:        #060810;
@@ -679,9 +678,31 @@
     html.simplex-light .admin-brand-mark svg path:nth-child(2) {
       stroke: rgba(15, 23, 42, 0.45);
     }
+
+    .admin-skip-link {
+      position: fixed; top: -100px; inset-inline-start: 14px; z-index: 9999;
+      padding: 9px 14px; border-radius: 6px; background: var(--cyan); color: #04101c;
+      font-weight: 700; font-size: 13px; text-decoration: none;
+    }
+    .admin-skip-link:focus { top: 12px; outline: 2px solid #fff; outline-offset: 2px; }
+    :where(a, button, textarea, input, [tabindex]):focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 2px;
+    }
+    @media (max-width: 720px) {
+      .admin-topbar { height: auto; min-height: var(--nav-h); }
+      .admin-topbar-inner { flex-wrap: wrap; padding: 10px 14px; gap: 8px; }
+      .admin-main { padding: 16px 12px 40px; }
+      .card-header, .editor-toolbar, .card-footer { flex-wrap: wrap; gap: 8px; padding-inline: 12px; }
+      .editor-textarea { min-height: 280px; font-size: 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
   </style>
 </head>
 <body>
+  <a href="#jsonEditor" class="admin-skip-link">Skip to JSON editor</a>
   <script>
     if (window.simplexThemeSync) window.simplexThemeSync(document.body);
   </script>

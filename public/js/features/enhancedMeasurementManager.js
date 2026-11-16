@@ -338,6 +338,16 @@ class EnhancedMeasurementManager {
         }
         if (!this.tilesetViewer || !this.tilesetViewer.viewer) return;
 
+        // Normalize documented shorthand measurement type names ('distance', 'plane', 'surface', 'ruler')
+        const TYPE_ALIASES = {
+            distance: 'distance-point',
+            ruler: 'polyline',
+            plane: 'roof-area',
+            surface: 'roof-area',
+        };
+        const resolvedType = TYPE_ALIASES[type] || type;
+        type = resolvedType;
+
         this.stopMeasurement(); // Stop any existing measurement
 
         this.isMeasuring = true;
@@ -1235,6 +1245,31 @@ class EnhancedMeasurementManager {
             this.hideModal();
             this.hideToolbar();
         }
+    }
+
+    /**
+     * Return all recorded measurements (structured result summary).
+     */
+    getResults() {
+        return (this.measurements || []).map((m, idx) => ({
+            id: m.id || `measurement_${idx + 1}`,
+            type: m.type,
+            value: m.value ?? m.distance ?? m.area ?? m.height ?? m.angle ?? m.volume ?? null,
+            formatted: m.formatted || m.text || m.label || '',
+            unit: m.unit || this.currentUnit || 'meters',
+            pointCount: Array.isArray(m.points) ? m.points.length : 0,
+            timestamp: m.timestamp || null,
+        }));
+    }
+
+    /**
+     * Alias for `clearAllMeasurements()` documented in the public API.
+     */
+    clear() {
+        if (typeof this.clearAllMeasurements === 'function') {
+            return this.clearAllMeasurements();
+        }
+        this.stopMeasurement?.();
     }
 }
 

@@ -34,17 +34,21 @@ class TilesetViewer {
     static OFFLINE_RASTER_STORAGE_KEY = 'simplex.offlineRasterSource';
 
     /**
-     * Valid offline raster folders (each must contain raster/{z}/{x}/{y}.png and meta.json).
+     * Valid basemap source identifiers:
+     * - `tiles`  : Standard offline raster (data/tiles/raster/{z}/{x}/{y}.png, auto OSM fallback)
+     * - `pro`    : Aerial offline raster (data/pro/raster/{z}/{x}/{y}.png, auto OSM fallback)
+     * - `vector` : Offline MVT vector tiles (data/tiles/vector/{z}/{x}/{y}.pbf)
+     * - `osm`    : Live OpenStreetMap imagery
      * @returns {string[]}
      */
     static getOfflineRasterFolderIds() {
-        return ['tiles', 'pro'];
+        return ['tiles', 'pro', 'vector', 'osm'];
     }
 
     _readOfflineRasterFolder() {
         try {
             const v = localStorage.getItem(TilesetViewer.OFFLINE_RASTER_STORAGE_KEY);
-            if (v === 'pro' || v === 'tiles') return v;
+            if (TilesetViewer.getOfflineRasterFolderIds().includes(v)) return v;
         } catch (_) {
             /* ignore */
         }
@@ -123,7 +127,33 @@ class TilesetViewer {
         this._offlineMapProvider = null;
 
         this._offlineRasterDataFolder = dataFolder;
-        this._addOfflineMapLayer(baseUrl, zooms, dataFolder);
+        if (dataFolder === 'vector' && typeof window.OfflineVectorTileProvider === 'function') {
+            try {
+                const vecProvider = new window.OfflineVectorTileProvider({
+                    baseUrl: `${baseUrl}/data/tiles/vector`,
+                    maximumLevel: 14,
+                    fallbackToGrid: true,
+                });
+                this._offlineMapProvider = vecProvider;
+                this._offlineMapLayer = this.viewer.imageryLayers.addImageryProvider(vecProvider, 0);
+            } catch (e) {
+                console.warn('Vector tile provider init fallback:', e);
+                this._addOfflineMapLayer(baseUrl, zooms, 'tiles');
+            }
+        } else if (dataFolder === 'osm' && typeof Cesium.OpenStreetMapImageryProvider === 'function') {
+            try {
+                const osmProvider = new Cesium.OpenStreetMapImageryProvider({
+                    url: 'https://tile.openstreetmap.org/',
+                });
+                this._offlineMapProvider = osmProvider;
+                this._offlineMapLayer = this.viewer.imageryLayers.addImageryProvider(osmProvider, 0);
+            } catch (e) {
+                console.warn('OSM provider init fallback:', e);
+                this._addOfflineMapLayer(baseUrl, zooms, 'tiles');
+            }
+        } else {
+            this._addOfflineMapLayer(baseUrl, zooms, dataFolder === 'pro' ? 'pro' : 'tiles');
+        }
 
         const sel = document.getElementById('offlineRasterSourceSelect');
         if (sel && sel.value !== dataFolder) {
@@ -136,8 +166,13 @@ class TilesetViewer {
         );
 
         if (window.app && typeof window.app.setTransientStatus === 'function') {
-            const label = dataFolder === 'pro' ? 'Aerial (data/pro)' : 'Standard (data/tiles)';
-            window.app.setTransientStatus(`Offline basemap: ${label}`, 2400);
+            const labels = {
+                tiles: 'Standard Offline (data/tiles)',
+                pro: 'Aerial Offline (data/pro)',
+                vector: 'Offline Vector (data/tiles/vector)',
+                osm: 'OpenStreetMap (Online)',
+            };
+            window.app.setTransientStatus(`Basemap: ${labels[dataFolder] || dataFolder}`, 2400);
         }
 
         return true;
@@ -554,17 +589,27 @@ class TilesetViewer {
                         this._offlineRasterDataFolder = rasterFolder;
                         const initGen = ++this._offlineRasterSwitchGeneration;
                         void (async () => {
-                            let zooms = defaultZooms;
-                            try {
-                                const z = await this.fetchOfflineMapZoomsFromMeta(baseUrl, rasterFolder);
-                                if (z && z.length) zooms = z;
-                            } catch (e) {
-                                /* ignore */
+                            if (rasterFolder === 'vector' || rasterFolder === 'osm') {
+                                await this.setOfflineRasterSource(rasterFolder);
+                                return;
                             }
-                            if (!this.viewer) return;
-                            if (initGen !== this._offlineRasterSwitchGeneration) return;
-                            this._addOfflineMapLayer(baseUrl, zooms, rasterFolder);
-                            this._loadOfflineMapConfig(baseUrl, rasterFolder);
+                            let zooms = null;
+                            try {
+                                zooms = await this.fetchOfflineMapZoomsFromMeta(baseUrl, rasterFolder);
+                            } catch (_) {
+                                zooms = null;
+                            }
+                            if (!this.viewer || initGen !== this._offlineRasterSwitchGeneration) return;
+                            if (zooms && zooms.length > 0) {
+                                this._addOfflineMapLayer(baseUrl, zooms, rasterFolder);
+                                this._loadOfflineMapConfig(baseUrl, rasterFolder);
+                            } else {
+                                // Zero-404 smart fallback: no local raster pyramid present yet -> activate online OSM directly
+                                this._addOnlineFallbackLayer(baseUrl, 0, 19);
+                                if (this._onlineFallbackLayer) {
+                                    this._onlineFallbackLayer.show = true;
+                                }
+                            }
                         })();
                     }
                     
@@ -1599,6 +1644,13 @@ class TilesetViewer {
 
             // Generate ID and store
             const id = this.generateTilesetId();
+            if (window.advancedTileLoading && typeof window.advancedTileLoading.optimizeTileset === 'function') {
+                try {
+                    window.advancedTileLoading.optimizeTileset(tileset, mergedOptions);
+                } catch (_) {
+                    /* non-fatal */
+                }
+            }
             this.tilesets.set(id, {
                 id: id,
                 tileset: tileset,
@@ -2163,14 +2215,22 @@ class TilesetViewer {
                     }
                 }
                 
-                // After 10 errors, check if any tiles loaded successfully
-                if (errorCount === 10 && successCount === 0) {
-                    console.error('⚠️  No offline map tiles loaded successfully. Check:');
-                    console.error(`  1. Map tiles location: data/${folder}/raster/`);
-                    console.error('  2. Server DATA_DIR path (check server console)');
-                    console.error('  3. File permissions and accessibility');
+                // After 8 errors with zero loaded tiles, activate the online OpenStreetMap fallback layer
+                if (errorCount === 8 && successCount === 0) {
+                    console.warn(`⚠️ Offline map tiles missing in data/${folder}/raster/ — enabling online OSM fallback if reachable.`);
+                    if (!this._onlineFallbackLayer) {
+                        this._addOnlineFallbackLayer(baseUrl, 0, 19);
+                    }
+                    if (this._onlineFallbackLayer) {
+                        this._onlineFallbackLayer.alpha = 1.0;
+                        this._onlineFallbackLayer.show = true;
+                        this.viewer?.scene?.requestRender?.();
+                    }
                 }
             });
+            
+            // Also inspect meta.json asynchronously for vector_zooms (offline .pbf/.mvt tiles)
+            this._loadOfflineMapConfig(baseUrl, folder);
             
             // Track successful tile loads - check if readyPromise exists
             if (offlineMapProvider.readyPromise) {
@@ -2208,10 +2268,27 @@ class TilesetViewer {
 
             if (response.ok) {
                 const meta = await response.json();
-                if (meta.raster_zooms && Array.isArray(meta.raster_zooms) && meta.raster_zooms.length > 0) {
-                    const zooms = meta.raster_zooms.sort((a, b) => a - b);
-                    console.log(`✓ Loaded offline map configuration [${folder}] from meta.json:`, meta);
-                    console.log(`  Available zoom levels: ${zooms.join(', ')}`);
+                this._offlineMapMeta = meta;
+                const hasRaster = Array.isArray(meta.raster_zooms) && meta.raster_zooms.length > 0;
+                const hasVector = Array.isArray(meta.vector_zooms) && meta.vector_zooms.length > 0;
+                if (hasRaster) {
+                    const zooms = [...meta.raster_zooms].sort((a, b) => a - b);
+                    console.log(`✓ Loaded offline raster map configuration [${folder}]: zooms ${zooms.join(', ')}`);
+                }
+                if (hasVector && !hasRaster && window.OfflineVectorTileImageryProvider && this.viewer) {
+                    const vZooms = [...meta.vector_zooms].sort((a, b) => a - b);
+                    const vectorProvider = new window.OfflineVectorTileImageryProvider({
+                        url: `${baseUrl}/data/${folder}/vector/{z}/{x}/{y}.pbf`,
+                        minimumLevel: vZooms[0],
+                        maximumLevel: vZooms[vZooms.length - 1],
+                        credit: `Offline vector tiles (data/${folder})`,
+                    });
+                    if (this._offlineVectorLayer) {
+                        this.viewer.imageryLayers.remove(this._offlineVectorLayer, true);
+                    }
+                    this._offlineVectorLayer = this.viewer.imageryLayers.addImageryProvider(vectorProvider, 1);
+                    this.viewer.scene?.requestRender?.();
+                    console.log(`✓ Loaded offline vector map layer [${folder}]: zooms ${vZooms.join(', ')}`);
                 }
             }
         } catch (error) {
@@ -2223,8 +2300,8 @@ class TilesetViewer {
      * Add online OpenStreetMap as fallback layer (only used if offline tiles completely unavailable)
      * @private
      */
-    _addOnlineFallbackLayer(baseUrl, minZoom, maxZoom) {
-        // Add online OSM as a fallback layer (only if offline completely fails)
+    _addOnlineFallbackLayer(baseUrl, minZoom, maxZoom, showImmediately = false) {
+        if (!this.viewer?.imageryLayers || typeof Cesium === 'undefined') return null;
         try {
             const osmProvider = new Cesium.UrlTemplateImageryProvider({
                 url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -2232,17 +2309,14 @@ class TilesetViewer {
                 rectangle: Cesium.Rectangle.MAX_VALUE,
                 credit: '© OpenStreetMap contributors (Online Fallback)',
                 minimumLevel: minZoom,
-                maximumLevel: Math.max(maxZoom, 19), // Allow higher zoom online
-                alpha: 0.0 // Hidden by default - only show if offline fails
+                maximumLevel: Math.max(maxZoom, 19),
             });
-            
             const osmLayer = this.viewer.imageryLayers.addImageryProvider(osmProvider);
+            osmLayer.alpha = showImmediately ? 1.0 : 0.0;
+            osmLayer.show = Boolean(showImmediately);
             this._onlineFallbackLayer = osmLayer;
-            console.log('Online OpenStreetMap fallback layer added (hidden, only shows if offline fails)');
-            
+            return osmLayer;
         } catch (error) {
-            console.warn('Failed to create online OpenStreetMap fallback:', error);
-            // Try simple URL without subdomains
             try {
                 const osmProviderSimple = new Cesium.UrlTemplateImageryProvider({
                     url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -2250,14 +2324,71 @@ class TilesetViewer {
                     credit: '© OpenStreetMap contributors (Online Fallback)',
                     minimumLevel: minZoom,
                     maximumLevel: Math.max(maxZoom, 19),
-                    alpha: 0.0
                 });
-                this.viewer.imageryLayers.addImageryProvider(osmProviderSimple);
-                console.log('Online OpenStreetMap fallback layer added (simple URL, hidden)');
+                const osmLayer = this.viewer.imageryLayers.addImageryProvider(osmProviderSimple);
+                osmLayer.alpha = showImmediately ? 1.0 : 0.0;
+                osmLayer.show = Boolean(showImmediately);
+                this._onlineFallbackLayer = osmLayer;
+                return osmLayer;
             } catch (error2) {
                 console.error('Failed to add online fallback layer:', error2);
+                return null;
             }
         }
+    }
+
+    /**
+     * Return current camera position and orientation in WGS84 degrees & meters.
+     */
+    getCameraPosition() {
+        if (!this.viewer?.camera || typeof Cesium === 'undefined') return null;
+        const cam = this.viewer.camera;
+        const carto = cam.positionCartographic;
+        if (!carto) return null;
+        const lon = Number(Cesium.Math.toDegrees(carto.longitude).toFixed(7));
+        const lat = Number(Cesium.Math.toDegrees(carto.latitude).toFixed(7));
+        const height = Number(carto.height.toFixed(2));
+        const heading = Number(Cesium.Math.toDegrees(cam.heading).toFixed(2));
+        const pitch = Number(Cesium.Math.toDegrees(cam.pitch).toFixed(2));
+        const roll = Number(Cesium.Math.toDegrees(cam.roll).toFixed(2));
+        return { lon, lat, longitude: lon, latitude: lat, height, heading, pitch, roll };
+    }
+
+    /**
+     * Fly camera to a WGS84 location `{ lon, lat, height, heading, pitch, roll, duration }` or loaded tileset ID.
+     */
+    flyTo(target, options = {}) {
+        if (!this.viewer || typeof Cesium === 'undefined' || !target) return false;
+        if (typeof target === 'string' && this.tilesets.has(target)) {
+            const entry = this.tilesets.get(target);
+            if (entry?.tileset) {
+                this.viewer.flyTo(entry.tileset, options);
+                this.viewer.scene?.requestRender?.();
+                return true;
+            }
+        }
+        const lon = Number(target.lon ?? target.longitude);
+        const lat = Number(target.lat ?? target.latitude);
+        if (!Number.isFinite(lon) || !Number.isFinite(lat)) return false;
+        const height = Number.isFinite(Number(target.height)) ? Number(target.height) : 1000;
+        const heading = Number.isFinite(Number(target.heading)) ? Number(target.heading) : 0;
+        const pitch = Number.isFinite(Number(target.pitch)) ? Number(target.pitch) : -45;
+        const roll = Number.isFinite(Number(target.roll)) ? Number(target.roll) : 0;
+        const duration = Number.isFinite(Number(target.duration ?? options.duration))
+            ? Number(target.duration ?? options.duration)
+            : 1.5;
+
+        this.viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
+            orientation: {
+                heading: Cesium.Math.toRadians(heading),
+                pitch: Cesium.Math.toRadians(pitch),
+                roll: Cesium.Math.toRadians(roll),
+            },
+            duration,
+        });
+        this.viewer.scene?.requestRender?.();
+        return true;
     }
 
     /**

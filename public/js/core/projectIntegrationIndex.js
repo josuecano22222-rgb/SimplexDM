@@ -25,6 +25,7 @@
         'js/core/tilesetViewer.js',
         'js/core/toolManager.js',
         'js/core/unitHelpers.js',
+        'js/core/webGisBridge.js',
         'js/features/bookmarkManager.js',
         'js/features/directionsManager.js',
         'js/features/coordinateManager.js',

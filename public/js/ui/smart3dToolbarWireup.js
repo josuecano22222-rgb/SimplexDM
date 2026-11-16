@@ -2063,7 +2063,11 @@
             }
             scheduleMeasureToolbarReparent();
             var mt = window.toolManager && window.toolManager.getTool('measureToolbar');
-            if (mt) mt.toggle();
+            if (mt && typeof mt.toggle === 'function') {
+                mt.toggle();
+            } else if (window.enhancedMeasurementManager && typeof window.enhancedMeasurementManager.toggle === 'function') {
+                window.enhancedMeasurementManager.toggle();
+            }
             syncMapToolAriaFromDom();
         },
         lineofsight: function (e) {
@@ -2076,7 +2080,15 @@
                 return;
             }
             var tool = window.toolManager && window.toolManager.getTool('createLineOfSight');
-            if (tool) tool.enabled = !tool.enabled;
+            if (tool) {
+                tool.enabled = !tool.enabled;
+            } else if (window.lineOfSightManager) {
+                if (isMapToolPanelVisible(window.lineOfSightManager.modal) && typeof window.lineOfSightManager.hide === 'function') {
+                    window.lineOfSightManager.hide();
+                } else if (typeof window.lineOfSightManager.show === 'function') {
+                    window.lineOfSightManager.show();
+                }
+            }
             syncMapToolAriaFromDom();
         },
         viewshed: function (e) {
@@ -2090,7 +2102,15 @@
                 return;
             }
             var tool = tm && tm.getTool('viewshed');
-            if (tool) tool.enabled = !tool.enabled;
+            if (tool) {
+                tool.enabled = !tool.enabled;
+            } else if (window.visibleHiddenAreasManager) {
+                if (isMapToolPanelVisible(window.visibleHiddenAreasManager.modal) && typeof window.visibleHiddenAreasManager.hide === 'function') {
+                    window.visibleHiddenAreasManager.hide();
+                } else if (typeof window.visibleHiddenAreasManager.show === 'function') {
+                    window.visibleHiddenAreasManager.show();
+                }
+            }
             syncMapToolAriaFromDom();
         },
         streetview: function (e) {

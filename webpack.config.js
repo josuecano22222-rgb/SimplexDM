@@ -2,83 +2,71 @@ const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
-const fs = require('fs');
+
+const { isBundledRendererScript } = require('./scripts/generate-webpack-entry.js');
 
 /**
- * `npm run webpack` passes `--mode production` but often leaves NODE_ENV unset.
- * Terser (drop_console, minimize) and HTML minify must follow the real webpack mode.
+ * `npm run webpack` passes `--mode production` while NODE_ENV may be unset.
+ * Terser and HTML minification follow the active webpack mode.
  */
 function isWebpackProduction() {
     const mi = process.argv.indexOf('--mode');
     if (mi >= 0 && process.argv[mi + 1] === 'production') {
         return true;
     }
+    if (mi >= 0 && process.argv[mi + 1] === 'development') {
+        return false;
+    }
     return process.env.NODE_ENV === 'production';
 }
 const isProd = isWebpackProduction();
 
-// Generate webpack entry file
-require('./scripts/generate-webpack-entry.js');
-
-// Custom plugin to remove individual script tags from HTML
-// IMPORTANT: This runs AFTER HtmlWebpackPlugin injects the bundle script
+/**
+ * Removes individual bundled `<script src="js/...">` tags from index.html while
+ * preserving standalone scripts (`js/simplexThemeSync.js`, `js/vendor/*`),
+ * third-party libraries (`lib/*`), and webpack-emitted chunk scripts.
+ */
 class RemoveScriptTagsPlugin {
     apply(compiler) {
         compiler.hooks.compilation.tap('RemoveScriptTagsPlugin', (compilation) => {
-            // Hook into alterAssetTags to ensure bundle is injected
-            HtmlWebpackPlugin.getHooks(compilation).alterAssetTags.tapAsync(
-                'RemoveScriptTagsPlugin',
-                (data, cb) => {
-                    // This hook runs when HtmlWebpackPlugin is preparing to inject scripts
-                    // We can verify the bundle script will be injected here
-                    if (data && data.bodyTags && Array.isArray(data.bodyTags)) {
-                        const bundleScript = data.bodyTags.find(tag => 
-                            tag.tagName === 'script' && 
-                            tag.attributes && 
-                            tag.attributes.src && 
-                            tag.attributes.src.includes('bundle.')
-                        );
-                        if (!bundleScript) {
-                            console.warn('⚠️  WARNING: Bundle script not found in asset tags!');
-                        }
-                    }
-                    cb(null, data);
-                }
-            );
-            
             HtmlWebpackPlugin.getHooks(compilation).beforeEmit.tapAsync(
                 'RemoveScriptTagsPlugin',
                 (data, cb) => {
                     if (data && data.html) {
-                        // Remove all script tags that point to js/ files (but keep bundle scripts and lib scripts)
-                        // Keep bundle.*.js files (webpack output) and lib/ scripts (Cesium, etc.)
-                        // Use negative lookahead to exclude bundle and lib
-                        data.html = data.html.replace(/<script src="js\/(?!bundle|lib)[^"]+"><\/script>\s*/g, '');
-                        
-                        // Verify bundle script exists as actual script tag (not in comment)
-                        const bundleScriptRegex = /<script[^>]*src=["']js\/bundle\.[^"']+\.js["'][^>]*><\/script>/i;
-                        const hasBundle = bundleScriptRegex.test(data.html);
-                        
-                        if (!hasBundle) {
-                            console.error('❌ ERROR: Bundle script NOT found in HTML!');
-                            console.error('   HtmlWebpackPlugin did not inject the bundle script.');
-                            console.error('   This will cause "Application Initialization Failed" error.');
-                            
-                            // Try to find the bundle filename and inject it manually
-                            const assets = compilation.getAssets();
-                            const bundleAsset = assets.find(asset => asset.name.includes('bundle.') && asset.name.endsWith('.js'));
-                            if (bundleAsset) {
-                                console.log('   Attempting to inject bundle manually...');
-                                const bundlePath = bundleAsset.name;
-                                const scriptTag = `\n    <script src="${bundlePath}"></script>`;
-                                // Inject before </body>
-                                data.html = data.html.replace('</body>', scriptTag + '\n</body>');
-                                console.log('   ✓ Bundle script injected manually');
-                            } else {
-                                console.error('   Could not find bundle asset to inject!');
+                        const emittedAssets = new Set(
+                            compilation.getAssets().map((asset) => asset.name.replace(/\\/g, '/'))
+                        );
+
+                        data.html = data.html.replace(
+                            /<script\b([^>]*)\bsrc=["']([^"']+)["']([^>]*)>\s*<\/script>\s*/gi,
+                            (fullTag, _pre, src) => {
+                                const clean = src.split('?')[0].split('#')[0].trim().replace(/^\.\//, '');
+                                if (emittedAssets.has(clean)) {
+                                    return fullTag;
+                                }
+                                if (/^js\/(?:bundle|runtime|vendor|cesium|core|features)\.[^/]+\.js$/i.test(clean)) {
+                                    return fullTag;
+                                }
+                                if (isBundledRendererScript(clean)) {
+                                    return '';
+                                }
+                                return fullTag;
                             }
-                        } else {
-                            console.log('✓ Bundle script found in HTML');
+                        );
+
+                        const bundleScriptRegex = /<script[^>]*src=["'](?:\.\/)?js\/bundle\.[^"']+\.js["'][^>]*><\/script>/i;
+                        if (!bundleScriptRegex.test(data.html)) {
+                            const bundleAsset = compilation
+                                .getAssets()
+                                .find((asset) => asset.name.startsWith('js/bundle.') && asset.name.endsWith('.js'));
+                            if (bundleAsset) {
+                                const scriptTag = `\n    <script src="${bundleAsset.name}"></script>`;
+                                data.html = data.html.replace('</body>', `${scriptTag}\n</body>`);
+                            } else {
+                                compilation.errors.push(
+                                    new Error('RemoveScriptTagsPlugin: webpack bundle script missing from index.html')
+                                );
+                            }
                         }
                     }
                     cb(null, data);
@@ -89,21 +77,19 @@ class RemoveScriptTagsPlugin {
 }
 
 module.exports = {
-    entry: './webpack-entry.js',
+    entry: {
+        bundle: './webpack-entry.js',
+    },
     output: {
         path: path.resolve(__dirname, 'public-bundled'),
-        filename: 'js/bundle.[contenthash].js',
+        filename: 'js/[name].[contenthash].js',
+        chunkFilename: 'js/[name].[contenthash].js',
         clean: true,
-        // Preserve global scope - don't wrap in IIFE
-        globalObject: 'this',
-        // Ensure modules are accessible
-        library: {
-            type: 'window',
-            name: 'Meridian'
-        },
+        globalObject: 'window',
     },
     mode: isProd ? 'production' : 'development',
-    target: 'electron-renderer',
+    // Renderer runs with contextIsolation: true and nodeIntegration: false
+    target: 'web',
     resolve: {
         extensions: ['.js'],
     },
@@ -114,18 +100,20 @@ module.exports = {
         new HtmlWebpackPlugin({
             template: path.join(__dirname, 'public', 'index.html'),
             filename: 'index.html',
-            inject: 'body', // Inject scripts before </body>
+            inject: 'body',
             scriptLoading: 'blocking',
-            minify: isProd ? {
-                removeComments: true,
-                collapseWhitespace: true,
-                removeRedundantAttributes: true,
-                useShortDoctype: true,
-                removeEmptyAttributes: true,
-                removeStyleLinkTypeAttributes: true,
-                minifyJS: true,
-                minifyCSS: true,
-            }             : false,
+            minify: isProd
+                ? {
+                      removeComments: true,
+                      collapseWhitespace: true,
+                      removeRedundantAttributes: true,
+                      useShortDoctype: true,
+                      removeEmptyAttributes: true,
+                      removeStyleLinkTypeAttributes: true,
+                      minifyJS: true,
+                      minifyCSS: true,
+                  }
+                : false,
         }),
         new RemoveScriptTagsPlugin(),
         new CopyWebpackPlugin({
@@ -141,6 +129,27 @@ module.exports = {
                         ],
                     },
                 },
+                // Preserve standalone scripts loaded directly by index.html, landing.html, and admin.html
+                {
+                    from: path.join(__dirname, 'public', 'js', 'simplexThemeSync.js'),
+                    to: path.join(__dirname, 'public-bundled', 'js', 'simplexThemeSync.js'),
+                    noErrorOnMissing: true,
+                },
+                {
+                    from: path.join(__dirname, 'public', 'js', 'siteContentClient.js'),
+                    to: path.join(__dirname, 'public-bundled', 'js', 'siteContentClient.js'),
+                    noErrorOnMissing: true,
+                },
+                {
+                    from: path.join(__dirname, 'public', 'js', 'siteContentAdmin.js'),
+                    to: path.join(__dirname, 'public-bundled', 'js', 'siteContentAdmin.js'),
+                    noErrorOnMissing: true,
+                },
+                {
+                    from: path.join(__dirname, 'public', 'js', 'vendor'),
+                    to: path.join(__dirname, 'public-bundled', 'js', 'vendor'),
+                    noErrorOnMissing: true,
+                },
             ],
         }),
     ],
@@ -150,10 +159,10 @@ module.exports = {
             new TerserPlugin({
                 terserOptions: {
                     compress: {
-                        drop_console: isProd, // Remove console in production
+                        drop_console: isProd,
                         drop_debugger: true,
                         pure_funcs: isProd ? ['console.log', 'console.info', 'console.debug'] : [],
-                        passes: 2, // Multiple passes for better optimization
+                        passes: 2,
                         unsafe: false,
                         unsafe_comps: false,
                         unsafe_math: false,
@@ -166,16 +175,19 @@ module.exports = {
                         comments: false,
                     },
                     mangle: {
-                        properties: false, // Don't mangle properties to avoid breaking CesiumJS
+                        properties: false,
                     },
                 },
                 extractComments: false,
             }),
         ],
+        // Keep exact registration/execution order across global singleton modules;
+        // renderer scripts rely on top-level side effects attaching to `window.*`.
+        sideEffects: true,
+        usedExports: false,
         splitChunks: {
-            chunks: 'all',
+            chunks: 'async',
             cacheGroups: {
-                // Separate vendor chunks for better caching
                 cesium: {
                     test: /[\\/]node_modules[\\/]cesium[\\/]/,
                     name: 'cesium',
@@ -188,32 +200,13 @@ module.exports = {
                     priority: 10,
                     reuseExistingChunk: true,
                 },
-                // Separate feature modules for lazy loading
-                features: {
-                    test: /[\\/]public[\\/]js[\\/]features[\\/]/,
-                    name: 'features',
-                    priority: 5,
-                    minChunks: 1,
-                },
-                // Core modules
-                core: {
-                    test: /[\\/]public[\\/]js[\\/]core[\\/]/,
-                    name: 'core',
-                    priority: 15,
-                    minChunks: 1,
-                },
             },
         },
-        usedExports: true, // Enable tree shaking
-        sideEffects: false, // Assume no side effects for better tree shaking
+    },
+    performance: {
+        hints: false,
     },
     externals: {
-        // Cesium is loaded via script tag, so exclude it from bundling
         cesium: 'Cesium',
-    },
-    // Handle global variables
-    node: {
-        __dirname: false,
-        __filename: false,
     },
 };

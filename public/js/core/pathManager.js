@@ -117,18 +117,24 @@ class PathManager {
         
         this.paths.set(path.id, path);
         
-        if (this.useLocalStorage) {
+        if (this.useLocalStorage || !this.db) {
             return this.savePathToLocalStorage(path);
         }
         
         try {
             const tx = this.db.transaction([this.storeName], 'readwrite');
             const store = tx.objectStore(this.storeName);
-            await store.put(path);
+            await new Promise((resolve, reject) => {
+                const req = store.put(path);
+                req.onerror = () => reject(req.error);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+                tx.onabort = () => reject(tx.error || new Error('Transaction aborted'));
+            });
             return path;
         } catch (error) {
             console.error('Failed to save path:', error);
-            throw error;
+            return this.savePathToLocalStorage(path);
         }
     }
 
@@ -209,18 +215,24 @@ class PathManager {
     async deletePath(id) {
         this.paths.delete(id);
         
-        if (this.useLocalStorage) {
+        if (this.useLocalStorage || !this.db) {
             return this.deletePathFromLocalStorage(id);
         }
         
         try {
             const tx = this.db.transaction([this.storeName], 'readwrite');
             const store = tx.objectStore(this.storeName);
-            await store.delete(id);
+            await new Promise((resolve, reject) => {
+                const req = store.delete(id);
+                req.onerror = () => reject(req.error);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+                tx.onabort = () => reject(tx.error || new Error('Transaction aborted'));
+            });
             return true;
         } catch (error) {
             console.error('Failed to delete path:', error);
-            throw error;
+            return this.deletePathFromLocalStorage(id);
         }
     }
 

@@ -45,18 +45,30 @@ desktop.ini
 logs/
 *.log
 
+# Python cache
+__pycache__/
+*.py[cod]
+
 # Temporary files
 tmp/
 temp/
 *.tmp
 
-# CesiumJS (large library, should be downloaded separately)
+# CesiumJS (large library, copied from node_modules via scripts/setup.js --copy-cesium)
 public/lib/cesium/
 
-# Application data (user-generated)
+# Application data (user-generated tiles & label databases)
 data/*.json
 data/*.db
+data/*.rlp
+data/tiles/
+data/pro/
 !data/.gitkeep
+!data/labels-world-base.db
+!data/label-download-manifest.json
+!data/config/app-config.json
+!data/samples/
+!data/samples/**
 
 # Coverage
 coverage/

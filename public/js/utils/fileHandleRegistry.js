@@ -92,19 +92,18 @@ class FileHandleRegistry {
             const db = await this.openDB();
             const tx = db.transaction(['handles'], 'readwrite');
             const store = tx.objectStore('handles');
-            
-            // Clear existing handles
-            await store.clear();
-            
-            // Store handles (Note: File handles cannot be serialized, so we store paths only)
-            // In a real implementation, you'd need to use a different approach
-            // For now, we'll store paths and rely on user re-selecting files
             const paths = Array.from(this.handles.keys());
-            for (const path of paths) {
-                await store.put({ path, timestamp: Date.now() });
-            }
-            
-            await tx.complete;
+            const timestamp = Date.now();
+
+            await new Promise((resolve, reject) => {
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+                tx.onabort = () => reject(tx.error || new Error('Transaction aborted'));
+                store.clear();
+                for (const p of paths) {
+                    store.put({ path: p, timestamp });
+                }
+            });
         } catch (error) {
             console.error('Failed to save handles:', error);
         }

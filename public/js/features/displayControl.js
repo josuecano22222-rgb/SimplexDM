@@ -236,6 +236,32 @@ class DisplayControl {
             this.setDefaultQuality(settings.defaultQuality);
         }
     }
+
+    /**
+     * Apply ultra-high accuracy leaf-tile processing to a loaded tileset (by ID, or active tileset).
+     */
+    async processLastTilesWithHighAccuracy(tilesetId = null) {
+        const all = this.getAllTilesets();
+        const entry = tilesetId ? this.currentTilesets.get(tilesetId) : all[0];
+        if (!entry || !window.tilesetProcessor) {
+            return null;
+        }
+        let tilesetJson = entry.tilesetJson || null;
+        if (!tilesetJson && entry.url && window.fileManager) {
+            try {
+                const raw = await window.fileManager.readFile(entry.url);
+                tilesetJson = JSON.parse(raw);
+            } catch (_) {
+                tilesetJson = { asset: { version: '1.0' }, root: {} };
+            }
+        }
+        const result = await window.tilesetProcessor.processLastTilesWithHighAccuracy(
+            tilesetJson || { asset: { version: '1.0' }, root: {} },
+            entry.tileset || null
+        );
+        window.tilesetViewer?.viewer?.scene?.requestRender?.();
+        return result;
+    }
 }
 
 // Export singleton instance
