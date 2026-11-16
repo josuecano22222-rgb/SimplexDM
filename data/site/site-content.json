@@ -1,0 +1,55 @@
+{
+  "brand": {
+    "productName": "Meridian 3D",
+    "tagline": "The 3D reality planning platform"
+  },
+  "hero": {
+    "headline": "Visualize, plan, and build the future on a high‑resolution 3D model of your reality",
+    "primaryCtaLabel": "Start Creating",
+    "primaryCtaHref": "index.html"
+  },
+  "cesiumInspired": {
+    "title": "Streaming 3D at city scale",
+    "subtitle": "A best-in-class 3D Tiles implementation — tuned for performance, precision, and interoperability.",
+    "cards": [
+      {
+        "key": "performant",
+        "eyebrow": "Performant",
+        "title": "3D model of Center City Philadelphia",
+        "body": "Center City Philadelphia, Pennsylvania — styled in shades of pink, purple, gray, and green. Optimized for smooth navigation and fast loading.",
+        "image": {
+          "src": "assets/philadelphia-palette.svg",
+          "alt": "Stylized 3D city palette preview"
+        }
+      },
+      {
+        "key": "precise",
+        "eyebrow": "Precise",
+        "title": "Analyze on a precise rendering engine",
+        "body": "Visualize and analyze your data on a rendering pipeline designed for stable, accurate geospatial results — from measurements to inspection workflows.",
+        "image": {
+          "src": "assets/precise-aerial.svg",
+          "alt": "Aerial cityscape preview"
+        }
+      },
+      {
+        "key": "open",
+        "eyebrow": "Open",
+        "title": "Interoperable and community-friendly",
+        "body": "Open and interoperable by design to support data compatibility and community collaboration across formats, pipelines, and toolchains.",
+        "image": {
+          "src": "assets/open-interoperable.svg",
+          "alt": "Open interoperability preview"
+        }
+      }
+    ],
+    "meshTriangles": {
+      "title": "Mesh triangles overlay (construction)",
+      "body": "Inspect a mesh with triangle overlays to validate surface quality, density, and coverage over a construction site.",
+      "image": {
+        "src": "assets/mesh-triangles.svg",
+        "alt": "Mesh triangles overlay preview"
+      }
+    }
+  }
+}

@@ -1,0 +1,195 @@
+{
+  "name": "SimplexDM",
+  "version": "2.0.0",
+  "description": "Professional desktop application for viewing, analyzing, and managing 3D Tiles (Cesium 3D Tiles) data",
+  "main": "electron-main.js",
+  "scripts": {
+    "dev": "cross-env NODE_ENV=development electron .",
+    "electron": "electron .",
+    "electron:dev": "cross-env NODE_ENV=development electron .",
+    "prewebpack": "node scripts/emit-locale.mjs",
+    "build:brand": "node scripts/export-brand-assets.mjs",
+    "webpack": "npm run build:brand && node scripts/generate-webpack-entry.js && webpack --mode production",
+    "webpack:dev": "node scripts/generate-webpack-entry.js && webpack --mode development",
+    "prebuild": "npm run webpack",
+    "build": "electron-builder",
+    "build:win": "npm run webpack && electron-builder --win",
+    "build:mac": "npm run webpack && electron-builder --mac",
+    "build:linux": "npm run webpack && electron-builder --linux",
+    "build:all": "npm run webpack && electron-builder --win --mac --linux",
+    "build:win-portable": "npm run webpack && electron-builder --win portable",
+    "package": "npm run webpack && electron-builder",
+    "package:all": "npm run webpack && electron-builder --win --mac --linux",
+    "start:server": "node server/server.js",
+    "build:toolbar-icons": "node public/Style/build-toolbar-icons.mjs",
+    "postinstall": "node scripts/setup.js && electron-rebuild -f -w better-sqlite3",
+    "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch --passWithNoTests",
+    "test:coverage": "jest --coverage --passWithNoTests",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration"
+  },
+  "keywords": [
+    "3d-tiles",
+    "cesium",
+    "geospatial",
+    "visualization",
+    "electron",
+    "desktop",
+    "3d",
+    "tileset",
+    "b3dm",
+    "i3dm",
+    "pnts",
+    "cmpt"
+  ],
+  "author": "SimplexDM Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/SimplexDM.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/SimplexDM/issues"
+  },
+  "homepage": "https://github.com/your-username/SimplexDM#readme",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=7.0.0"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.29.2",
+    "@electron/rebuild": "^4.0.3",
+    "@jest/globals": "^29.7.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "copy-webpack-plugin": "^14.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^40.0.0",
+    "electron-builder": "^26.6.0",
+    "html-webpack-plugin": "^5.6.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^30.3.0",
+    "png-to-ico": "^3.0.1",
+    "png2icons": "^2.0.1",
+    "terser-webpack-plugin": "^5.3.10",
+    "webpack": "^5.95.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "build": {
+    "appId": "com.meridian.viewer",
+    "productName": "SimplexDM",
+    "copyright": "Copyright © 2026",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron-main.js",
+      "main/**/*",
+      "preload.js",
+      "public-bundled/**/*",
+      "server/**/*",
+      "scripts/**/*",
+      "data/**/*",
+      "package.json",
+      "!public/**/*",
+      "!webpack-entry.js",
+      "!data/tiles/raster/**/*",
+      "!data/tiles/raster.zip",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "server/**/*"
+    ],
+    "extraFiles": [
+      {
+        "from": "data",
+        "to": "data",
+        "filter": [
+          "**/*",
+          "!tiles/raster/**/*",
+          "!tiles/raster.zip"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "mac": {
+      "icon": "build/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SimplexDM",
+      "include": "build/installer.nsh",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "menuCategory": false,
+      "artifactName": "${productName}-${version}-Setup.${ext}",
+      "warningsAsErrors": false
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-Portable.${ext}"
+    }
+  },
+  "dependencies": {
+    "@ngageoint/geopackage": "^4.2.5",
+    "@tmcw/togeojson": "^7.1.2",
+    "better-sqlite3": "^12.8.0",
+    "cesium": "^1.137.0",
+    "epsg-index": "^2.0.0",
+    "geotiff": "^3.0.5",
+    "jsts": "^2.12.1",
+    "papaparse": "^5.5.3",
+    "proj4": "^2.20.4",
+    "shapefile": "^0.6.6",
+    "unzipper": "^0.12.3",
+    "xlsx": "^0.18.5",
+    "xmldom": "^0.6.0"
+  }
+}

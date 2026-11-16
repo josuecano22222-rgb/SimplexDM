@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/*
+!build/meridian-icon.svg
+!build/meridian_worldclass_logo.svg
+!build/map-packaging-guide.md
+!build/installer.nsh
+!build/icon.png
+!build/icon.ico
+!build/icon.icns
+!build/icons/
+!build/icons/**
+out/
+public-bundled/
+webpack-entry.js
+
+# Electron
+*.asar
+*.asar.unpacked
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# CesiumJS (large library, should be downloaded separately)
+public/lib/cesium/
+
+# Application data (user-generated)
+data/*.json
+data/*.db
+!data/.gitkeep
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Testing
+.test/

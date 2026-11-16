@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0a0d16">
+    <script src="js/simplexThemeSync.js"></script>
+    <script>
+        if (window.simplexThemeSync) window.simplexThemeSync(null);
+    </script>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:* http://127.0.0.1:* data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdnjs.cloudflare.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' http://localhost:* http://127.0.0.1:* data: blob:; font-src 'self' data:; connect-src 'self' http://localhost:* http://127.0.0.1:* data: blob:;">
+    <title>Meridian — Reality Planning Platform</title>
+    <link rel="icon" href="assets/meridian-icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="lib/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/ui-improvements.css">
+    <link rel="stylesheet" href="css/labelManager.css">
+    <link rel="stylesheet" href="Style/Smart3d_Style.toolbar.css">
+    <script src="lib/cesium/Cesium.js"></script>
+    <script src="lib/cesium/packages/ion-sdk-geometry/Build/IonSdkGeometry/IonSdkGeometry.js"></script>
+    <script src="lib/cesium/packages/ion-sdk-measurements/Build/IonSdkMeasurements/IonSdkMeasurements.js"></script>
+    <script src="lib/cesium/packages/ion-sdk-sensors/Build/IonSdkSensors/IonSdkSensors.js"></script>
+    <link href="lib/cesium/Widgets/widgets.css" rel="stylesheet">
+    <link href="lib/cesium/packages/ion-sdk-measurements/Build/IonSdkMeasurements/IonSdkMeasurements/widgets.css" rel="stylesheet">
+    <script>
+        (function() {
+            var _d = false;
+            try {
+                _d = window.location.search.indexOf('debug=1') !== -1
+                    || localStorage.getItem('simplex_debug') === '1'
+                    || (window.electronAPI && window.electronAPI.isDev === true);
+            } catch (e) {}
+            if (_d) {
+                console.log('=== Meridian Startup ===');
+                window.addEventListener('error', (e) => { if (e.filename && e.filename.includes('bundle')) console.error('Bundle error:', e.message, e.filename, e.lineno); }, true);
+            }
+        })();
+        if (typeof Cesium !== 'undefined') {
+            window.CESIUM_BASE_URL = 'lib/cesium/';
+            Cesium.Ion.defaultAccessToken = '';
+            if (Cesium.Ion) Cesium.Ion.defaultAccessToken = '';
+            window.cesiumAvailable = true;
+            window.__preferIonSdkMeasurements = true;
+        } else {
+            window.cesiumAvailable = false;
+            console.warn('CesiumJS failed to load');
+        }
+    </script>
+
+</head>
+<body class="dock-panel-ui theme-dark">
+<script>
+    if (window.simplexThemeSync) window.simplexThemeSync(document.body);
+</script>
+
+<!-- ══════════════════════════════════════════════════════════
+     TOP NAVIGATION BAR
+══════════════════════════════════════════════════════════ -->
+<nav class="top-navbar">
+    <a href="landing.html" id="navHomeLink" class="nav-btn nav-btn-link" data-i18n-title="ui.nav.home">
+        <i class="fas fa-arrow-left" aria-hidden="true"></i><span class="nav-home-label" data-i18n="ui.nav.home">Home</span>
+    </a>
+    <span class="nav-divider" aria-hidden="true"></span>
+    <div class="navbar-brand-wrap">
+        <a href="landing.html" class="navbar-brand">
+            <div class="brand-mark">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 3L4 7.5V16.5L12 21L20 16.5V7.5L12 3Z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+                    <path d="M12 3V12M12 12L4 7.5M12 12L20 7.5" stroke="rgba(255,255,255,0.5)" stroke-width="1" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <div class="brand-text">
+                <span class="brand-name" data-i18n="ui.brand.name">Meridian</span>
+                <span class="brand-sub" data-i18n="ui.brand.sub">Reality Planning Platform</span>
+            </div>
+        </a>
+    </div>
+
+    <div class="navbar-actions">
+        <div class="nav-cluster nav-cluster-tools">
+            <div class="nav-tools-pill">
+            <button type="button" id="navigationHelpBtn" class="nav-btn">
+                <i class="fas fa-compass"></i><span data-i18n="ui.nav.navigation">Navigation</span>
+            </button>
+            <button type="button" id="databaseBtn" class="nav-btn">
+                <i class="fas fa-database"></i><span data-i18n="ui.nav.database">Database</span>
+            </button>
+            <button type="button" id="dashboardBtn" class="nav-btn">
+                <i class="fas fa-th-large"></i><span data-i18n="ui.nav.dashboard">Dashboard</span>
+            </button>
+            <button type="button" id="directionsBtn" class="nav-btn" data-i18n-title="ui.nav.directionsTitle">
+                <i class="fas fa-route"></i><span data-i18n="ui.nav.directions">Directions</span>
+            </button>
+            <button type="button" id="controlCenterBtn" class="nav-btn" data-i18n-title="ui.nav.controlCenterTitle">
+                <i class="fas fa-sliders-h"></i><span data-i18n="ui.nav.controlCenter">Control Center</span><span class="nav-control-chevron" aria-hidden="true">▾</span>
+            </button>
+            </div>
+        </div>
+        <div class="nav-cluster nav-cluster-cta">
+            <button type="button" id="helpBtn" class="nav-btn nav-btn-cta">
+                <i class="fas fa-question-circle"></i><span data-i18n="ui.nav.help">Help</span>
+            </button>
+        </div>
+    </div>
+</nav>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     MAIN CONTAINER
+══════════════════════════════════════════════════════════ -->
+<div class="main-container">
+
+    <!-- Sidebar edge toggles (same control opens and closes) -->
+    <button type="button" class="restore-btn left" id="restoreLeftSidebar" title="Open Layers &amp; Regions panel" data-i18n-title="ui.restore.leftTitle" data-i18n-aria="ui.restore.leftAria" aria-expanded="false" aria-controls="leftSidebar">
+        <span class="restore-chevron" aria-hidden="true">›</span>
+    </button>
+    <button type="button" class="restore-btn right" id="restoreRightSidebar" data-i18n-title="ui.restore.rightTitle" data-i18n-aria="ui.restore.rightAria" aria-expanded="false" aria-controls="rightSidebar">
+        <span class="restore-chevron" aria-hidden="true">‹</span>
+    </button>
+
+    <!-- ══════════════════════════════════════════════════════
+         LEFT SIDEBAR — Layers & Regions
+    ══════════════════════════════════════════════════════ -->
+    <aside class="sidebar left collapsed" id="leftSidebar" data-i18n-aria="ui.leftSidebar.aria">
+        <div class="sidebar-head">
+            <div class="sidebar-head-text">
+                <span class="sidebar-title"><i class="fas fa-layer-group" aria-hidden="true"></i><span data-i18n="ui.leftSidebar.title">Layers &amp; regions</span></span>
+                <span class="sidebar-subtitle" data-i18n="ui.leftSidebar.subtitle">Map data &amp; discovery</span>
+            </div>
+            <button type="button" class="sidebar-collapse-btn" id="toggleLeftSidebar" data-i18n-title="ui.leftSidebar.toggleTitle" aria-expanded="false" aria-controls="leftSidebar">
+                <i class="fas fa-chevron-left" aria-hidden="true"></i>
+            </button>
+        </div>
+        <div class="sidebar-body">
+            <div class="left-sidebar-stack">
+
+            <div class="s-section s-section-highlight">
+                <div class="s-body s-body-tight">
+                    <div class="layers-actions-grid">
+                    <button type="button" class="btn btn-primary btn-block" id="openLayersMenuBtn">
+                        <i class="fas fa-layer-group"></i> <span data-i18n="ui.leftSidebar.layersMenu">Layers Menu</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-block" id="coordinateResearchBtn" data-i18n-title="ui.leftSidebar.coordinateResearchTitle">
+                        <i class="fas fa-crosshairs" aria-hidden="true"></i> <span data-i18n="ui.leftSidebar.coordinateResearch">Coordinate Research</span>
+                    </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="s-section">
+                <div class="s-head"><span class="s-head-label" data-i18n="ui.leftSidebar.search">Search</span></div>
+                <div class="s-body">
+                    <div class="search-wrap sidebar-search-wrap">
+                        <input type="text" id="regionSearch" data-i18n-placeholder="ui.leftSidebar.regionSearchPlaceholder" placeholder="Search regions…" class="search-input">
+                        <i class="fas fa-search search-icon"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="s-section">
+                <div class="s-head"><span class="s-head-label" data-i18n="ui.leftSidebar.filters">Filters</span></div>
+                <div class="s-body">
+                    <div class="filter-group">
+                        <label class="field-label" data-i18n="ui.leftSidebar.dateRange">Date Range</label>
+                        <div class="date-row">
+                            <input type="date" id="dateFilterStart" class="date-input">
+                            <span class="date-sep">→</span>
+                            <input type="date" id="dateFilterEnd" class="date-input">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="s-section">
+                <div class="s-head">
+                    <span class="s-head-label" data-i18n="ui.leftSidebar.regions">Regions</span>
+                    <span class="s-count regions-count-badge" id="regionsCount">0</span>
+                </div>
+                <div class="s-body regions-s-body">
+                    <div id="regionsList">
+                        <div class="empty-state">
+                            <i class="fas fa-layer-group empty-state-icon" aria-hidden="true"></i>
+                            <p data-i18n="ui.leftSidebar.emptyNoRegions">No regions found</p>
+                            <p class="empty-hint" data-i18n="ui.leftSidebar.emptyHint">Load one or more main tileset JSON files (Add / Load tileset) to build the region catalog</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="s-section" id="labelManagerSection">
+                <div class="s-head"><span class="s-head-label" data-i18n="ui.labels.sectionTitle">Map labels (offline)</span></div>
+                <div class="s-body s-body-tight">
+                    <div id="labelManagerMount"></div>
+                </div>
+            </div>
+
+            </div>
+        </div>
+    </aside>
+
+    <!-- ══════════════════════════════════════════════════════
+         CENTER — 3D VIEWER
+    ══════════════════════════════════════════════════════ -->
+    <main class="viewer-container">
+        <div id="cesiumContainer" class="cesium-viewer"></div>
+
+        <!-- Map compass: live heading, click ring to face a bearing, drag to rotate, double-click dial for north -->
+        <div id="mapCompassWidget" class="map-compass-widget" role="region" data-i18n-aria="ui.viewer.compassAria">
+            <div class="map-compass-head">
+                <span class="map-compass-title" data-i18n="ui.viewer.compassTitle">Compass</span>
+                <button type="button" id="mapCompassCollapse" class="map-compass-collapse" data-i18n-title="ui.viewer.compassHideTitle" data-i18n-aria="ui.viewer.compassHideAria">×</button>
+            </div>
+            <div id="mapCompassDial" class="map-compass-dial" data-i18n-title="ui.viewer.compassDialTitle">
+                <svg class="map-compass-svg" viewBox="0 0 100 100" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="mapCompassGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:rgba(0,185,255,0.35)"/>
+                            <stop offset="100%" style="stop-color:rgba(0,185,255,0.06)"/>
+                        </linearGradient>
+                    </defs>
+                    <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(0,185,255,0.35)" stroke-width="1.2"/>
+                    <polygon points="50,6 56,22 50,18 44,22" fill="rgba(255,120,90,0.95)" stroke="rgba(255,200,180,0.5)" stroke-width="0.5"/>
+                    <g id="mapCompassRose" class="map-compass-rose" transform="rotate(0 50 50)">
+                        <text x="50" y="22" text-anchor="middle" class="map-compass-n">N</text>
+                        <text x="78" y="54" text-anchor="middle" class="map-compass-ew">E</text>
+                        <text x="50" y="88" text-anchor="middle" class="map-compass-s">S</text>
+                        <text x="22" y="54" text-anchor="middle" class="map-compass-ew">W</text>
+                        <circle cx="50" cy="50" r="2.2" fill="url(#mapCompassGrad)" stroke="rgba(0,185,255,0.4)" stroke-width="0.6"/>
+                    </g>
+                </svg>
+            </div>
+            <div class="map-compass-readout" aria-live="polite">
+                <span id="mapCompassHeadingText" class="map-compass-deg">0°</span>
+                <span id="mapCompassCardinal" class="map-compass-card">N</span>
+            </div>
+            <div class="map-compass-apply">
+                <label class="map-compass-apply-label" for="mapCompassBearingInput" data-i18n="ui.viewer.bearing">Bearing</label>
+                <div class="map-compass-apply-inner">
+                    <input type="number" id="mapCompassBearingInput" class="map-compass-input" min="0" max="359" step="1" data-i18n-placeholder="ui.viewer.bearingPlaceholder" placeholder="0–359" inputmode="numeric" data-i18n-aria="ui.viewer.bearingAria"/>
+                    <button type="button" id="mapCompassApplyBtn" class="map-compass-apply-btn" data-i18n-title="ui.viewer.setBearingTitle" data-i18n="ui.viewer.setBearing">Set</button>
+                </div>
+            </div>
+        </div>
+        <button type="button" id="mapCompassShowBtn" class="map-compass-show-btn" data-i18n-title="ui.viewer.compassShowTitle" data-i18n-aria="ui.viewer.compassShowAria"><i class="fas fa-compass" aria-hidden="true"></i></button>
+
+        <!-- Map toolbar — Map_Toolbar_Complete_Spec.md Part A (normative DOM) -->
+        <div id="toolbar"></div>
+        <div class="viewer-modes-stack viewer-modes-stack--spectral" id="viewerModesStack">
+        <div id="toolbarMeasure" class="sub-toolbar measure-sub-toolbar" style="display:none;" aria-hidden="true"></div>
+        <div class="sub-toolbar" id="toolbarSE" role="region" aria-hidden="true" aria-labelledby="special_effects">
+            <div class="toolbar-se-settings-row" id="sceneModesSettingsHost" aria-label="Scene mode parameters"></div>
+            <div class="toolbar-se-button-ribbon" role="group" aria-label="Scene display modes">
+            <div class="toolbar-se-cluster toolbar-se-cluster--surface">
+            <button type="button" id="transparency" class="transparency buttons-Simplex sub-toolbar-button" data-tool="scene_transparency" title="Transparency" aria-pressed="false" aria-label="Transparency"></button>
+            <button type="button" id="fog" class="fog buttons-Simplex sub-toolbar-button" data-tool="scene_fog" title="Fog" aria-pressed="false" aria-label="Fog"></button>
+            <button type="button" id="white" class="white buttons-Simplex sub-toolbar-button" data-tool="scene_white" title="White model" aria-pressed="false" aria-label="White model"></button>
+            </div>
+            <div class="toolbar-se-sep" aria-hidden="true"></div>
+            <div class="toolbar-se-cluster toolbar-se-cluster--terrain">
+            <button type="button" id="slope" class="slope buttons-Simplex sub-toolbar-button" data-tool="scene_slope" title="Slope" aria-pressed="false" aria-label="Slope shading"></button>
+            <button type="button" id="height" class="height buttons-Simplex sub-toolbar-button" data-tool="scene_height" title="Height coloring" aria-pressed="false" aria-label="Height coloring"></button>
+            <button type="button" id="distance" class="distance buttons-Simplex sub-toolbar-button" data-tool="scene_distance" title="Depth map" aria-pressed="false" aria-label="Depth map"></button>
+            <button type="button" id="direction" class="direction buttons-Simplex sub-toolbar-button" data-tool="scene_direction" title="Direction / aspect" aria-pressed="false" aria-label="Direction / aspect"></button>
+            </div>
+            <div class="toolbar-se-sep" aria-hidden="true"></div>
+            <div class="toolbar-se-cluster toolbar-se-cluster--weather">
+            <button type="button" id="snow" class="snow buttons-Simplex sub-toolbar-button" data-tool="scene_snow" title="Snow" aria-pressed="false" aria-label="Snow"></button>
+            <button type="button" id="rain" class="rain buttons-Simplex sub-toolbar-button" data-tool="scene_rain" title="Rain" aria-pressed="false" aria-label="Rain"></button>
+            <button type="button" id="clouds" class="clouds buttons-Simplex sub-toolbar-button" data-tool="scene_clouds" title="Clouds" aria-pressed="false" aria-label="Clouds"></button>
+            </div>
+            <div class="toolbar-se-sep" aria-hidden="true"></div>
+            <div class="toolbar-se-cluster toolbar-se-cluster--view">
+            <button type="button" id="ortho" class="ortho buttons-Simplex sub-toolbar-button" data-tool="scene_ortho" title="Orthographic view" aria-pressed="false" aria-label="Orthographic view"></button>
+            <button type="button" id="remapColors" class="remapColors buttons-Simplex sub-toolbar-button" data-tool="scene_remapColors" title="Thematic color map" aria-pressed="false" aria-label="Thematic color map"></button>
+            </div>
+            <div class="toolbar-se-sep toolbar-se-sep--advanced" aria-hidden="true"></div>
+            <div class="toolbar-se-cluster toolbar-se-cluster--advanced" role="group" aria-label="Advanced display options">
+            <button type="button" id="openDisplayModesAdvancedBtn" class="buttons-Simplex sub-toolbar-button toolbar-se-advanced-btn" data-tool="display_modes_advanced" data-i18n-title="ui.viewer.displayModesAdvancedTitle" data-i18n-aria="ui.viewer.displayModesAdvancedAria" title="Advanced display options" aria-label="Advanced display options">⚙</button>
+            </div>
+            </div>
+        </div>
+        </div>
+        <div class="tools tools-strip" id="mapToolsStrip" role="toolbar" data-i18n-aria="ui.viewer.toolsStripAria">
+            <button type="button" id="mapToolsStripToggle" class="tools-strip-toggle" aria-expanded="true" aria-controls="mapToolsStripBody" title="Hide map tools" aria-label="Hide map tools">
+                <i class="fas fa-angles-down tools-strip-toggle-icon" aria-hidden="true"></i>
+            </button>
+            <div class="tools-strip-body" id="mapToolsStripBody">
+            <div class="tools-group tools-group-nav" data-i18n-title="ui.viewer.toolsGroupNav">
+                <div class="tools-group-inner">
+                <button type="button" id="layersIC" class="layersIC buttons-Simplex" data-tool="layersIC" title="Layers" aria-pressed="false" aria-label="Layers"></button>
+                <button type="button" id="view_home" class="home buttons-Simplex" data-tool="view_home" title="Home view" aria-label="Home view"></button>
+                <button type="button" id="gotoPrevView" class="gotoPrev buttons-Simplex" data-tool="gotoPrevView" title="Previous camera view" disabled="" aria-label="Previous camera view"></button>
+                <button type="button" id="gotoNextView" class="gotoNext buttons-Simplex" data-tool="gotoNextView" title="Next camera view" disabled="" aria-label="Next camera view"></button>
+                <div class="north-container">
+                    <button type="button" id="navNorth" class="buttons-Simplex" data-tool="navNorth" title="Rotate to north" aria-label="Rotate to north"></button>
+                    <div class="north-arrow" style="--rotation: -360deg;"></div>
+                </div>
+                <button type="button" id="topView" class="topview buttons-Simplex" data-tool="topView" title="Top view" aria-label="Top view"></button>
+                </div>
+                <span class="tools-group-label" data-i18n="ui.viewer.toolsGroupNav">Navigation</span>
+            </div>
+            <span class="tools-sep" aria-hidden="true"></span>
+            <div class="tools-group tools-group-output" data-i18n-title="ui.viewer.toolsGroupCapture">
+                <div class="tools-group-inner">
+                <button type="button" id="share" class="share buttons-Simplex" data-tool="share" title="Share location" aria-label="Share location"></button>
+                <button type="button" id="printscreen" class="printscreen buttons-Simplex" data-tool="printscreen" title="Screenshot" aria-label="Screenshot"></button>
+                </div>
+                <span class="tools-group-label" data-i18n="ui.viewer.toolsGroupCapture">Capture and share</span>
+            </div>
+            <span class="tools-sep" aria-hidden="true"></span>
+            <div class="tools-group tools-group-scene" data-i18n-title="ui.viewer.toolsGroupScene">
+                <div class="tools-group-inner">
+                <button type="button" id="streetview" class="streetview buttons-Simplex" data-tool="streetview" title="Street view" aria-label="Street view"></button>
+                <button type="button" id="flightmode" class="flightmode buttons-Simplex" data-tool="flightmode" title="Flight mode" aria-label="Flight mode"></button>
+                <button type="button" id="clipplane" class="clipplane buttons-Simplex" data-tool="clipplane" title="Clip with polygon" aria-label="Clip with polygon"></button>
+                <button type="button" id="split" class="split buttons-Simplex" data-tool="split" title="Split screen" aria-label="Split screen"></button>
+                </div>
+                <span class="tools-group-label" data-i18n="ui.viewer.toolsGroupScene">Scene tools</span>
+            </div>
+            <span class="tools-sep" aria-hidden="true"></span>
+            <div class="tools-group tools-group-analysis" data-i18n-title="ui.viewer.toolsGroupAnalysis">
+                <div class="tools-group-inner">
+                <button type="button" id="measure" class="measure buttons-Simplex" data-tool="measure" title="Measure" aria-pressed="false" aria-label="Measure"></button>
+                <button type="button" id="lineofsight" class="lineofsight buttons-Simplex" data-tool="lineofsight" title="Line of sight" aria-pressed="false" aria-label="Line of sight"></button>
+                <button type="button" id="viewshed" class="viewshed buttons-Simplex" data-tool="viewshed" title="Viewshed (visible / occluded)" aria-pressed="false" aria-label="Viewshed"></button>
+                <button type="button" id="elevationProfileButton" class="elevationProfile buttons-Simplex" data-tool="elevationProfile" title="Elevation profile" aria-label="Elevation profile"></button>
+                </div>
+                <span class="tools-group-label" data-i18n="ui.viewer.toolsGroupAnalysis">Measurement and analysis</span>
+            </div>
+            <span class="tools-sep" aria-hidden="true"></span>
+            <div class="tools-group tools-group-display" data-i18n-title="ui.viewer.toolsGroupDisplay">
+                <div class="tools-group-inner">
+                <button type="button" id="special_effects" class="special_effects buttons-Simplex" data-tool="special_effects" title="Display modes" aria-pressed="false" aria-expanded="false" aria-controls="toolbarSE" aria-label="Display modes"></button>
+                </div>
+                <span class="tools-group-label" data-i18n="ui.viewer.toolsGroupDisplay">Display modes</span>
+            </div>
+            </div>
+        </div>
+        <div class="tools_special_effects" style="visibility:hidden" aria-hidden="true"></div>
+        <div id="toolbarLOS" class="toolbarLOS"></div>
+        <div id="toolbarVSH" class="toolbarVSH"></div>
+        <div id="toolbarRadius" class="toolbarVSH"></div>
+        <div id="cut_surface_toolbox" style="display:none" aria-hidden="true"></div>
+        <div id="modal_elevationProfile" class="elevationProfile-container" style="display:none;">
+            <div id="modal-move-elevation-profile" class="elevation-profile-drag"></div>
+            <button type="button" id="modal-close-ep" class="elevation-profile-close" data-i18n-title="ui.viewer.elevationCloseTitle" data-i18n-aria="ui.viewer.elevationCloseAria">×</button>
+            <div id="elevationProfileChartHost" class="elevation-profile-chart-host"></div>
+        </div>
+        <div id="editmodel" class="editmodel-smart3d" style="display:none;"></div>
+
+        <!-- SIM Floating Controls (shown/hidden by simIntegrationManager) -->
+        <div id="simFloatingControls" class="floating-panel" style="display:none;">
+            <div class="sim-floating-header">
+                <strong><i class="fas fa-vector-square" aria-hidden="true"></i><span data-i18n="ui.viewer.simTitle">SIM Visual Tools</span></strong>
+                <span class="sim-floating-subtitle" data-i18n="ui.viewer.simSubtitle">On-screen controls</span>
+            </div>
+            <div class="ctrl-group" style="display:none;" aria-hidden="true">
+                <label data-i18n="ui.viewer.simMeasureLabel">SIM Measurement Panel</label>
+                <div id="simMeasureContainerPanel" class="sim-measure-panel-host"></div>
+            </div>
+            <div class="ctrl-group sim-sensor-group">
+                <label data-i18n="ui.viewer.simSensorLabel">Sensor Controls</label>
+                <div class="ctrl-row sim-sensor-actions">
+                    <button type="button" id="simSensorShowBtn" class="btn btn-xs btn-primary"><i class="fas fa-eye"></i> <span data-i18n="ui.viewer.simShow">Show</span></button>
+                    <button type="button" id="simSensorHideBtn" class="btn btn-xs"><i class="fas fa-eye-slash"></i> <span data-i18n="ui.viewer.simHide">Hide</span></button>
+                    <button type="button" id="simSensorPickBtn" class="btn btn-xs"><i class="fas fa-crosshairs"></i> <span data-i18n="ui.viewer.simPick">Pick</span></button>
+                </div>
+                <div class="ctrl-group"><label data-i18n="ui.viewer.simRadius">Radius (m)</label><input id="simSensorRadiusInput" type="number" class="number-input" value="250" min="1" step="1"></div>
+                <div class="ctrl-group"><label data-i18n="ui.viewer.simXHalf">X Half Angle (deg)</label><input id="simSensorXHalfAngleInput" type="number" class="number-input" value="35" min="1" max="89" step="1"></div>
+                <div class="ctrl-group"><label data-i18n="ui.viewer.simYHalf">Y Half Angle (deg)</label><input id="simSensorYHalfAngleInput" type="number" class="number-input" value="20" min="1" max="89" step="1"></div>
+                <div class="ctrl-group"><label data-i18n="ui.viewer.simLon">Longitude</label><input id="simSensorLonInput" type="number" class="number-input" value="32.36" step="0.000001"></div>
+                <div class="ctrl-group"><label data-i18n="ui.viewer.simLat">Latitude</label><input id="simSensorLatInput" type="number" class="number-input" value="36.58" step="0.000001"></div>
+                <div class="ctrl-group"><label data-i18n="ui.viewer.simHeight">Height (m)</label><input id="simSensorHeightInput" type="number" class="number-input" value="120" step="1"></div>
+                <div class="ctrl-row sim-sensor-footer">
+                    <button type="button" id="simSensorApplyBtn" class="btn btn-xs btn-primary"><i class="fas fa-check"></i> <span data-i18n="ui.viewer.simApply">Apply</span></button>
+                    <button type="button" id="simSensorResetBtn" class="btn btn-xs"><i class="fas fa-undo"></i> <span data-i18n="ui.viewer.simReset">Reset</span></button>
+                </div>
+                <div id="simSensorStatus" data-i18n="ui.viewer.simReady">Ready</div>
+            </div>
+        </div>
+
+        <!-- Selected Coordinate Overlay -->
+        <div id="selectedCoordinateOverlay" class="selected-coordinate-overlay" style="display:none;" role="dialog" aria-labelledby="selectedCoordinateName" aria-modal="true">
+            <div class="coordinate-content">
+                <div class="coordinate-content-head">
+                    <h3 id="selectedCoordinateName" class="coordinate-title"></h3>
+                    <button type="button" id="closeCoordinateOverlay" class="close-btn coordinate-close" data-i18n-aria="ui.viewer.coordOverlayCloseAria">×</button>
+                </div>
+                <dl class="coordinate-readout">
+                    <div class="coordinate-readout-row">
+                        <dt data-i18n="ui.viewer.coordLon">Longitude</dt><dd><span id="selectedLon" class="coordinate-value">—</span></dd>
+                    </div>
+                    <div class="coordinate-readout-row">
+                        <dt data-i18n="ui.viewer.coordLat">Latitude</dt><dd><span id="selectedLat" class="coordinate-value">—</span></dd>
+                    </div>
+                    <div class="coordinate-readout-row">
+                        <dt data-i18n="ui.viewer.coordHeight">Height</dt><dd><span id="selectedHeight" class="coordinate-value">—</span><span class="coordinate-unit" data-i18n="ui.viewer.coordUnitM"> m</span></dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Distance, area, height, coordinates, etc.: Cesium Ion SDK bar in .cesium-viewer-toolbar (no duplicate rail). -->
+    </main>
+
+
+    <!-- ══════════════════════════════════════════════════════
+         RIGHT SIDEBAR — Controls
+    ══════════════════════════════════════════════════════ -->
+    <aside class="sidebar right rs-controls collapsed" id="rightSidebar" data-i18n-aria="ui.rightSidebar.aria">
+        <div class="sidebar-head rs-controls-head">
+            <div class="sidebar-head-text">
+                <span class="sidebar-title"><i class="fas fa-sliders-h" aria-hidden="true"></i><span data-i18n="ui.rightSidebar.title">Controls</span></span>
+                <span class="sidebar-subtitle" data-i18n="ui.rightSidebar.subtitle">Scene, features &amp; analysis</span>
+            </div>
+            <button type="button" class="sidebar-collapse-btn rs-collapse-btn" id="toggleRightSidebar" data-i18n-title="ui.restore.rightTitle" data-i18n-aria="ui.restore.rightTitle" aria-expanded="false" aria-controls="rightSidebar">
+                <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            </button>
+        </div>
+        <div class="sidebar-body">
+
+            <!-- Offline raster basemap (data/tiles vs data/pro) — not 3D Tiles -->
+            <div class="collapsible-section collapsed" id="offlineBasemapSection">
+                <button type="button" class="s-toggle s-toggle--icon" data-section="offlineBasemapSection" aria-expanded="false" aria-controls="offlineBasemapSection" data-i18n-title="ui.rightSidebar.offlineBasemapTitle">
+                    <span class="s-toggle-label"><i class="fas fa-map" aria-hidden="true"></i><span data-i18n="ui.rightSidebar.offlineBasemapTitle">Offline basemap</span></span>
+                    <span class="s-chevron" aria-hidden="true"><i class="fas fa-chevron-down" aria-hidden="true"></i></span>
+                </button>
+                <div class="section-content-wrapper">
+                    <p class="sidebar-hint-text" data-i18n="ui.rightSidebar.offlineBasemapHint">Choose which raster tile folder the globe uses (standard vs aerial). Independent of 3D tilesets.</p>
+                    <div class="ctrl-group">
+                        <label for="offlineRasterSourceSelect" data-i18n="ui.rightSidebar.offlineBasemapSource">Map source</label>
+                        <select id="offlineRasterSourceSelect" class="select-input inspector-style-select">
+                            <option value="tiles" data-i18n="ui.rightSidebar.offlineBasemapTiles">Standard imagery (data/tiles)</option>
+                            <option value="pro" data-i18n="ui.rightSidebar.offlineBasemapPro">Aerial imagery (data/pro)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Display Control -->
+            <div class="collapsible-section" id="displayControlSection">
+                <button type="button" class="s-toggle s-toggle--icon" data-section="displayControlSection" aria-expanded="true" aria-controls="displayControlSection" data-i18n-title="ui.rightSidebar.displayControl">
+                    <span class="s-toggle-label"><i class="fas fa-layer-group" aria-hidden="true"></i><span data-i18n="ui.rightSidebar.displayControl">Display Control</span></span>
+                    <span class="s-chevron" aria-hidden="true"><i class="fas fa-chevron-down" aria-hidden="true"></i></span>
+                </button>
+                <div class="section-content-wrapper">
+                    <div class="display-control-quick-load rs-quick-load" data-display-quick-load="true">
+                        <button type="button" class="btn btn-primary btn-icon btn-icon--tileset" id="quickLoadTilesetBtn" data-i18n-title="ui.rightSidebar.quickLoadTileset" data-i18n-aria="ui.rightSidebar.quickLoadTileset">
+                            <i class="fas fa-folder-open" aria-hidden="true"></i>
+                            <span class="visually-hidden" data-i18n="ui.rightSidebar.quickLoadTileset">Load tileset</span>
+                        </button>
+                    </div>
+                    <div class="tileset-bar">
+                        <select id="tilesetSelector" class="select-input"><option value="" data-i18n="ui.rightSidebar.selectTilesetPlaceholder">Select tileset…</option></select>
+                        <button type="button" id="addTilesetBtn" class="btn btn-primary btn-icon btn-icon--add-tileset" data-i18n-title="ui.rightSidebar.addTilesetTitle" data-i18n-aria="ui.rightSidebar.addTilesetTitle"><i class="fas fa-plus" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.addTilesetTitle">Add tileset</span></button>
+                    </div>
+                    <div class="tileset-list" id="tilesetList"></div>
+                    <div class="quality-row">
+                        <label data-i18n="ui.rightSidebar.quality">Quality</label>
+                        <select id="qualitySelector" class="select-input">
+                            <option value="low" data-i18n="ui.rightSidebar.qualityLow">Low</option>
+                            <option value="medium" selected data-i18n="ui.rightSidebar.qualityMedium">Medium</option>
+                            <option value="high" data-i18n="ui.rightSidebar.qualityHigh">High</option>
+                            <option value="ultra" data-i18n="ui.rightSidebar.qualityUltra">Ultra</option>
+                        </select>
+                    </div>
+                    <div class="sub-panel">
+                        <div class="sub-panel-title"><i class="fas fa-sync-alt" aria-hidden="true"></i><span data-i18n="ui.rightSidebar.rotation">Rotation</span></div>
+                        <div class="display-dpad-grid rotation-dpad">
+                            <span class="dpad-spacer"></span>
+                            <button type="button" id="tiltUpPanelBtn" class="btn btn-xs btn-dpad" data-i18n-title="ui.rightSidebar.tiltUpTitle" data-i18n-aria="ui.rightSidebar.tiltUpTitle"><i class="fas fa-arrow-up" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.tiltUp">Up</span></button>
+                            <span class="dpad-spacer"></span>
+                            <button type="button" id="rotateLeftPanelBtn" class="btn btn-xs btn-dpad" data-i18n-title="ui.rightSidebar.rotateLeftTitle" data-i18n-aria="ui.rightSidebar.rotateLeftTitle"><i class="fas fa-arrow-left" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.rotateL">L</span></button>
+                            <span class="dpad-spacer"></span>
+                            <button type="button" id="rotateRightPanelBtn" class="btn btn-xs btn-dpad" data-i18n-title="ui.rightSidebar.rotateRightTitle" data-i18n-aria="ui.rightSidebar.rotateRightTitle"><i class="fas fa-arrow-right" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.rotateR">R</span></button>
+                            <span class="dpad-spacer"></span>
+                            <button type="button" id="tiltDownPanelBtn" class="btn btn-xs btn-dpad" data-i18n-title="ui.rightSidebar.tiltDnTitle" data-i18n-aria="ui.rightSidebar.tiltDnTitle"><i class="fas fa-arrow-down" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.tiltDn">Dn</span></button>
+                            <span class="dpad-spacer"></span>
+                        </div>
+                    </div>
+                    <div class="sub-panel">
+                        <div class="sub-panel-title"><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span data-i18n="ui.rightSidebar.position">Position</span></div>
+                        <div class="position-dpad-wrap">
+                        <div class="display-dpad-grid position-nsew">
+                            <span class="dpad-spacer"></span>
+                            <button type="button" id="moveNorthBtn" class="btn btn-xs btn-dpad" data-i18n-title="ui.rightSidebar.moveNorthTitle" data-i18n-aria="ui.rightSidebar.moveNorthTitle"><i class="fas fa-arrow-up" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.moveN">N</span></button>
+                            <span class="dpad-spacer"></span>
+                            <button type="button" id="moveWestBtn" class="btn btn-xs btn-dpad" data-i18n-title="ui.rightSidebar.moveWestTitle" data-i18n-aria="ui.rightSidebar.moveWestTitle"><i class="fas fa-arrow-left" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.moveW">W</span></button>
+                            <span class="dpad-spacer"></span>
+                            <button type="button" id="moveEastBtn" class="btn btn-xs btn-dpad" data-i18n-title="ui.rightSidebar.moveEastTitle" data-i18n-aria="ui.rightSidebar.moveEastTitle"><i class="fas fa-arrow-right" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.moveE">E</span></button>
+                            <span class="dpad-spacer"></span>
+                            <button type="button" id="moveSouthBtn" class="btn btn-xs btn-dpad" data-i18n-title="ui.rightSidebar.moveSouthTitle" data-i18n-aria="ui.rightSidebar.moveSouthTitle"><i class="fas fa-arrow-down" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.moveS">S</span></button>
+                            <span class="dpad-spacer"></span>
+                        </div>
+                        <div class="position-vertical-stack">
+                            <button type="button" id="moveUpBtn" class="btn btn-xs btn-dpad" data-i18n-title="ui.rightSidebar.moveUpVertTitle" data-i18n-aria="ui.rightSidebar.moveUpVertTitle"><i class="fas fa-chevron-up" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.moveUp">Up</span></button>
+                            <button type="button" id="moveDownBtn" class="btn btn-xs btn-dpad" data-i18n-title="ui.rightSidebar.moveDownVertTitle" data-i18n-aria="ui.rightSidebar.moveDownVertTitle"><i class="fas fa-chevron-down" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.moveDown">Down</span></button>
+                        </div>
+                        </div>
+                        <div class="step-ctrl step-ctrl-row">
+                            <label data-i18n="ui.rightSidebar.stepSize">Step Size</label>
+                            <div class="step-ctrl-inner">
+                                <input type="number" id="stepSizeInput" value="1" min="0.01" step="0.01" class="number-input">
+                                <select id="stepSizeUnit" class="select-input">
+                                    <option value="m" data-i18n="ui.rightSidebar.stepMeters">Meters</option>
+                                    <option value="cm" data-i18n="ui.rightSidebar.stepCm">Centimeters</option>
+                                    <option value="km" data-i18n="ui.rightSidebar.stepKm">Kilometers</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="target-ctrl">
+                            <label data-i18n="ui.rightSidebar.target">Target</label>
+                            <select id="targetSelector" class="select-input">
+                                <option value="selected" data-i18n="ui.rightSidebar.targetSelected">Selected Tileset</option>
+                                <option value="all" data-i18n="ui.rightSidebar.targetAll">All Tilesets</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature Manager -->
+            <div class="collapsible-section" id="featureManagerSection">
+                <button type="button" class="s-toggle s-toggle--icon" data-section="featureManagerSection" aria-expanded="true" aria-controls="featureManagerSection" data-i18n-title="ui.rightSidebar.featureManager">
+                    <span class="s-toggle-label"><i class="fas fa-draw-polygon" aria-hidden="true"></i><span data-i18n="ui.rightSidebar.featureManager">Feature Manager</span></span>
+                    <span class="s-chevron" aria-hidden="true"><i class="fas fa-chevron-down" aria-hidden="true"></i></span>
+                </button>
+                <div class="section-content-wrapper">
+                    <p class="feature-manager-hint" id="featureManagerHint" role="status" data-i18n="ui.rightSidebar.featureHint">Place point: click the map, then name it. The marker uses your picked height. Coordinates appear on the marker and in the list. Live cursor position: status bar below.</p>
+                    <div class="feature-toolbar rs-feature-toolbar">
+                        <div class="feature-toolbar-row rs-feature-draw-row">
+                            <button type="button" id="placePointBtn" class="btn btn-primary btn-icon btn-icon--feature" data-i18n-title="ui.rightSidebar.placePointTitle" data-i18n-aria="ui.rightSidebar.placePointTitle">
+                                <i class="fas fa-crosshairs" aria-hidden="true"></i>
+                                <span class="visually-hidden" data-i18n="ui.rightSidebar.placePoint">Place point</span>
+                            </button>
+                            <button type="button" id="drawLineBtn" class="btn btn-secondary btn-icon btn-icon--feature" data-i18n-title="ui.rightSidebar.lineTitle" data-i18n-aria="ui.rightSidebar.lineTitle">
+                                <i class="fas fa-slash" aria-hidden="true"></i>
+                                <span class="visually-hidden" data-i18n="ui.rightSidebar.line">Line</span>
+                            </button>
+                            <button type="button" id="drawPolygonBtn" class="btn btn-secondary btn-icon btn-icon--feature" data-i18n-title="ui.rightSidebar.areaTitle" data-i18n-aria="ui.rightSidebar.areaTitle">
+                                <i class="fas fa-vector-square" aria-hidden="true"></i>
+                                <span class="visually-hidden" data-i18n="ui.rightSidebar.area">Area</span>
+                            </button>
+                        </div>
+                        <div class="feature-toolbar-row rs-feature-io-row">
+                            <button type="button" id="importFeaturesBtn" class="btn btn-xs btn-icon btn-icon--muted" data-i18n-title="ui.rightSidebar.importTitle" data-i18n-aria="ui.rightSidebar.importTitle"><i class="fas fa-file-import" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.import">Import</span></button>
+                            <button type="button" id="exportFeaturesBtn" class="btn btn-xs btn-icon btn-icon--muted" data-i18n-title="ui.rightSidebar.exportTitle" data-i18n-aria="ui.rightSidebar.exportTitle"><i class="fas fa-file-export" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.export">Export</span></button>
+                            <button type="button" id="clearFeaturesBtn" class="btn btn-xs btn-icon btn-icon--danger" data-i18n-title="ui.rightSidebar.clearAllTitle" data-i18n-aria="ui.rightSidebar.clearAllTitle"><i class="fas fa-trash-alt" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.clearAll">Clear all</span></button>
+                        </div>
+                        <div class="feature-toolbar-row rs-feature-excel-row">
+                            <button type="button" id="importExcelBtn" class="btn btn-xs btn-icon btn-icon--muted" data-i18n-title="ui.rightSidebar.importExcelTitle" data-i18n-aria="ui.rightSidebar.importExcelTitle"><i class="fas fa-file-excel" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.importExcel">Import Excel</span></button>
+                            <button type="button" id="exportExcelBtn" class="btn btn-xs btn-icon btn-icon--muted" data-i18n-title="ui.rightSidebar.exportExcelTitle" data-i18n-aria="ui.rightSidebar.exportExcelTitle"><i class="fas fa-file-excel" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.exportExcel">Export Excel</span></button>
+                        </div>
+                    </div>
+                    <div class="feature-list feature-list-modern" id="featureList"></div>
+                </div>
+            </div>
+
+            <!-- Feature Information -->
+            <div class="collapsible-section" id="featureInfoSection">
+                <button type="button" class="s-toggle s-toggle--icon" data-section="featureInfoSection" aria-expanded="true" aria-controls="featureInfoSection" data-i18n-title="ui.rightSidebar.featureInfo">
+                    <span class="s-toggle-label"><i class="fas fa-info-circle" aria-hidden="true"></i><span data-i18n="ui.rightSidebar.featureInfo">Feature Information</span></span>
+                    <span class="s-chevron" aria-hidden="true"><i class="fas fa-chevron-down" aria-hidden="true"></i></span>
+                </button>
+                <div class="section-content-wrapper">
+                    <div class="tabs rs-tabs-icon" role="tablist">
+                        <button type="button" class="tab-btn active" data-tab="metadata" role="tab" aria-selected="true" data-i18n-title="ui.rightSidebar.tabMetaTip" data-i18n-aria="ui.rightSidebar.tabMetaTip"><i class="fas fa-database" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.tabMetaShort">Metadata</span></button>
+                        <button type="button" class="tab-btn" data-tab="json" role="tab" aria-selected="false" data-i18n-title="ui.rightSidebar.tabJsonTip" data-i18n-aria="ui.rightSidebar.tabJsonTip"><i class="fas fa-code" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.tabJsonShort">JSON</span></button>
+                        <button type="button" class="tab-btn" data-tab="tileInfo" role="tab" aria-selected="false" data-i18n-title="ui.rightSidebar.tabTileTip" data-i18n-aria="ui.rightSidebar.tabTileTip"><i class="fas fa-cube" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.tabTileShort">Tile</span></button>
+                    </div>
+                    <div class="tab-content active" id="metadataTab">
+                        <div id="metadataContent" class="metadata-content"></div>
+                    </div>
+                    <div class="tab-content" id="jsonTab">
+                        <div id="jsonTree" class="json-tree"></div>
+                        <div id="jsonTreeControls" class="json-tree-controls-panel"></div>
+                    </div>
+                    <div class="tab-content" id="tileInfoTab">
+                        <div id="tileInfoContent" class="tile-info-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SIM Visual Tools -->
+            <div class="collapsible-section collapsed" id="simVisualToolsSection">
+                <button type="button" class="s-toggle s-toggle--icon" data-section="simVisualToolsSection" aria-expanded="false" aria-controls="simVisualToolsSection" data-i18n-title="ui.rightSidebar.simVisualTools">
+                    <span class="s-toggle-label"><i class="fas fa-cogs" aria-hidden="true"></i><span data-i18n="ui.rightSidebar.simVisualTools">SIM Visual Tools</span></span>
+                    <span class="s-chevron" aria-hidden="true"><i class="fas fa-chevron-down" aria-hidden="true"></i></span>
+                </button>
+                <div class="section-content-wrapper">
+                    <p class="sim-sidebar-hint" data-i18n-html="ui.rightSidebar.simVisualHint">
+                        Analysis tools use the <strong>Cesium Ion SDK</strong> bar at the top of the 3D view: expand the ruler control to switch horizontal distance, polyline, area, height, vertical distance, point coordinates, and related modes. Sensor controls stay in the floating panel when SIM is active.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Platform Controls — platformControlsUI.js -->
+            <div class="collapsible-section collapsed" id="platformControlsSection">
+                <button type="button" class="s-toggle s-toggle--icon" data-section="platformControlsSection" aria-expanded="false" aria-controls="platformControlsSection" data-i18n-title="ui.rightSidebar.platformControls">
+                    <span class="s-toggle-label"><i class="fas fa-city" aria-hidden="true"></i><span data-i18n="ui.rightSidebar.platformControls">Platform Controls</span></span>
+                    <span class="s-chevron" aria-hidden="true"><i class="fas fa-chevron-down" aria-hidden="true"></i></span>
+                </button>
+                <div class="section-content-wrapper">
+                    <div class="platform-ctrl-row">
+                        <label class="platform-toggle-label"><input type="checkbox" id="siteAccessibleToggle" class="platform-toggle-switch"> <span data-i18n="ui.rightSidebar.siteAccessible">Site Accessible</span></label>
+                    </div>
+                    <div class="platform-ctrl-row">
+                        <label class="platform-toggle-label"><input type="checkbox" id="landUseToggle" class="platform-toggle-switch"> <span data-i18n="ui.rightSidebar.landUse">Land Use</span></label>
+                    </div>
+                    <div class="platform-ctrl-row platform-sun-row">
+                        <label class="platform-sun-label" for="sunPositionInput" data-i18n="ui.rightSidebar.sunPosition">Sun position</label>
+                        <input type="datetime-local" id="sunPositionInput" class="select-input platform-sun-input">
+                    </div>
+                    <div class="platform-action-grid rs-platform-actions">
+                        <button type="button" id="planBuildBtn" class="btn btn-xs platform-grid-btn btn-icon btn-icon--platform" data-i18n-title="ui.rightSidebar.planBuildTitle" data-i18n-aria="ui.rightSidebar.planBuildTitle"><i class="fas fa-drafting-compass" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.planBuild">Plan/Build</span></button>
+                        <button type="button" id="commentBtn" class="btn btn-xs platform-grid-btn btn-icon btn-icon--platform" data-i18n-title="ui.rightSidebar.commentTitle" data-i18n-aria="ui.rightSidebar.commentTitle"><i class="fas fa-comment" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.comment">Comment</span></button>
+                        <button type="button" id="shareBtn" class="btn btn-xs platform-grid-btn btn-icon btn-icon--platform" data-i18n-title="ui.rightSidebar.shareTitle" data-i18n-aria="ui.rightSidebar.shareTitle"><i class="fas fa-share-alt" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.share">Share</span></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tile hierarchy layers (bounding volumes — not JSON tree) -->
+            <div class="collapsible-section collapsed" id="tileHierarchyLayersSection">
+                <button type="button" class="s-toggle s-toggle--icon" data-section="tileHierarchyLayersSection" aria-expanded="false" aria-controls="tileHierarchyLayersSection" data-i18n-title="ui.rightSidebar.tileHierarchyTitle">
+                    <span class="s-toggle-label"><i class="fas fa-sitemap" aria-hidden="true"></i><span data-i18n="ui.rightSidebar.tileHierarchyTitle">Tile layer preview</span></span>
+                    <span class="s-chevron" aria-hidden="true"><i class="fas fa-chevron-down" aria-hidden="true"></i></span>
+                </button>
+                <div class="section-content-wrapper tile-hierarchy-section-inner">
+                    <div class="tile-hierarchy-panel">
+                        <p class="sidebar-hint-text tile-hierarchy-hint" data-i18n="ui.rightSidebar.tileHierarchyHint">Show 3D Tiles bounding volumes in the scene: spheres, boxes, and regions use different colors. Use leaf mode for final layers. Separate from the JSON tab.</p>
+
+                        <div class="tile-hierarchy-group tile-hierarchy-group--toggles">
+                            <label class="tile-hierarchy-toggle">
+                                <input type="checkbox" id="tileHierarchyOverlayToggle" />
+                                <span data-i18n="ui.rightSidebar.tileHierarchyShowOverlay">Show overlay</span>
+                            </label>
+                            <label class="tile-hierarchy-toggle">
+                                <input type="checkbox" id="tileHierarchyShowLodLabels" />
+                                <span data-i18n="ui.rightSidebar.tileHierarchyLodLabels">LOD labels (L0, L1…)</span>
+                            </label>
+                        </div>
+
+                        <div class="tile-hierarchy-group tile-hierarchy-group--fields">
+                            <div class="tile-hierarchy-field">
+                                <label for="tileHierarchyTilesetSelect" data-i18n="ui.rightSidebar.tileHierarchyTileset">Tileset</label>
+                                <select id="tileHierarchyTilesetSelect" class="select-input inspector-style-select tile-hierarchy-select"></select>
+                            </div>
+                            <div class="tile-hierarchy-field">
+                                <label for="tileHierarchyColorBy" data-i18n="ui.rightSidebar.tileHierarchyColorBy">Color by</label>
+                                <select id="tileHierarchyColorBy" class="select-input inspector-style-select tile-hierarchy-select">
+                                    <option value="volumeType" data-i18n="ui.rightSidebar.tileHierarchyColorVolume">Volume type (sphere / box / region)</option>
+                                    <option value="lodLevel" data-i18n="ui.rightSidebar.tileHierarchyColorLod">LOD depth</option>
+                                </select>
+                            </div>
+                            <div class="tile-hierarchy-field">
+                                <label for="tileHierarchyVolumeFilter" data-i18n="ui.rightSidebar.tileHierarchyVolumeFilter">Show volumes</label>
+                                <select id="tileHierarchyVolumeFilter" class="select-input inspector-style-select tile-hierarchy-select">
+                                    <option value="all" data-i18n="ui.rightSidebar.tileHierarchyVolAll">All</option>
+                                    <option value="sphere" data-i18n="ui.rightSidebar.tileHierarchyVolSphere">Spheres only</option>
+                                    <option value="box" data-i18n="ui.rightSidebar.tileHierarchyVolBox">Boxes only</option>
+                                    <option value="region" data-i18n="ui.rightSidebar.tileHierarchyVolRegion">Regions only</option>
+                                </select>
+                            </div>
+                            <div class="tile-hierarchy-field">
+                                <label for="tileHierarchyDepthMode" data-i18n="ui.rightSidebar.tileHierarchyDepthMode">Tree depth</label>
+                                <select id="tileHierarchyDepthMode" class="select-input inspector-style-select tile-hierarchy-select">
+                                    <option value="all" data-i18n="ui.rightSidebar.tileHierarchyDepthAll">All nodes</option>
+                                    <option value="leaves" data-i18n="ui.rightSidebar.tileHierarchyDepthLeaves">Leaf tiles only (final layers)</option>
+                                </select>
+                            </div>
+                            <div class="tile-hierarchy-field tile-hierarchy-field--max">
+                                <label for="tileHierarchyMaxShapes" data-i18n="ui.rightSidebar.tileHierarchyMaxShapes">Max shapes</label>
+                                <input type="number" id="tileHierarchyMaxShapes" class="select-input tile-hierarchy-max-shapes" min="8" max="2000" value="160" />
+                            </div>
+                        </div>
+
+                        <div class="tile-hierarchy-group tile-hierarchy-group--actions">
+                            <div class="tile-hierarchy-actions-grid rs-th-actions" role="toolbar" data-i18n-aria="ui.rightSidebar.tileHierarchyActionsAria">
+                                <button type="button" id="tileHierarchyRefreshBtn" class="btn btn-xs tile-hierarchy-btn btn-icon btn-icon--hier" data-i18n-title="ui.rightSidebar.tileHierarchyRefresh" data-i18n-aria="ui.rightSidebar.tileHierarchyRefresh">
+                                    <i class="fas fa-sync-alt" aria-hidden="true"></i>
+                                    <span class="visually-hidden" data-i18n="ui.rightSidebar.tileHierarchyRefresh">Refresh</span>
+                                </button>
+                                <button type="button" id="tileHierarchyZoomLeafBtn" class="btn btn-xs btn-primary tile-hierarchy-btn tile-hierarchy-btn--primary btn-icon btn-icon--hier" data-i18n-title="ui.rightSidebar.tileHierarchyZoomLeaf" data-i18n-aria="ui.rightSidebar.tileHierarchyZoomLeaf">
+                                    <i class="fas fa-search-plus" aria-hidden="true"></i>
+                                    <span class="visually-hidden" data-i18n="ui.rightSidebar.tileHierarchyZoomLeaf">Zoom to leaf</span>
+                                </button>
+                                <button type="button" id="tileHierarchyLoadAllBtn" class="btn btn-xs tile-hierarchy-btn btn-icon btn-icon--hier" data-i18n-title="ui.rightSidebar.tileHierarchyLoadAll" data-i18n-aria="ui.rightSidebar.tileHierarchyLoadAll">
+                                    <i class="fas fa-download" aria-hidden="true"></i>
+                                    <span class="visually-hidden" data-i18n="ui.rightSidebar.tileHierarchyLoadAllShort">Load all</span>
+                                </button>
+                                <button type="button" id="tileHierarchyRestoreLodBtn" class="btn btn-xs tile-hierarchy-btn btn-icon btn-icon--hier" disabled data-i18n-title="ui.rightSidebar.tileHierarchyRestoreLod" data-i18n-aria="ui.rightSidebar.tileHierarchyRestoreLod">
+                                    <i class="fas fa-undo" aria-hidden="true"></i>
+                                    <span class="visually-hidden" data-i18n="ui.rightSidebar.tileHierarchyRestoreLod">Restore LOD</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tile Inspector -->
+            <div class="collapsible-section collapsed" id="tileInspectorSection">
+                <button type="button" class="s-toggle s-toggle--icon" data-section="tileInspectorSection" aria-expanded="false" aria-controls="tileInspectorSection" data-i18n-title="ui.rightSidebar.tileInspector">
+                    <span class="s-toggle-label"><i class="fas fa-search" aria-hidden="true"></i><span data-i18n="ui.rightSidebar.tileInspector">Tile Inspector</span></span>
+                    <span class="s-chevron" aria-hidden="true"><i class="fas fa-chevron-down" aria-hidden="true"></i></span>
+                </button>
+                <div class="section-content-wrapper">
+                    <div class="ctrl-group">
+                        <label data-i18n="ui.rightSidebar.viewControls">View Controls</label>
+                        <div class="ctrl-row rs-inspector-actions">
+                            <button type="button" id="inspectorResetViewBtn" class="btn btn-xs btn-icon btn-icon--inspector" data-i18n-title="ui.rightSidebar.inspectorResetTitle" data-i18n-aria="ui.rightSidebar.inspectorResetTitle"><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.inspectorResetShort">Reset view</span></button>
+                            <button type="button" id="inspectorToggleTilesetBtn" class="btn btn-xs btn-icon btn-icon--inspector" data-i18n-title="ui.rightSidebar.inspectorToggleTitle" data-i18n-aria="ui.rightSidebar.inspectorToggleTitle"><i class="fas fa-eye" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.inspectorToggleShort">Toggle tileset</span></button>
+                            <button type="button" id="inspectorAnalyzeBtn" class="btn btn-xs btn-icon btn-icon--inspector" data-i18n-title="ui.rightSidebar.inspectorAnalyzeTitle" data-i18n-aria="ui.rightSidebar.inspectorAnalyzeTitle"><i class="fas fa-chart-bar" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.inspectorAnalyzeShort">Analyze</span></button>
+                        </div>
+                    </div>
+                    <div class="ctrl-group">
+                        <label data-i18n="ui.rightSidebar.stats">Stats</label>
+                        <div id="inspectorStats">
+                            <div class="stat-item"><span data-i18n="ui.rightSidebar.loadedTiles">Loaded Tiles</span> <span id="inspectorTileCount">0</span></div>
+                            <div class="stat-item"><span data-i18n="ui.rightSidebar.totalFeatures">Total Features</span> <span id="inspectorFeatureCount">0</span></div>
+                        </div>
+                    </div>
+                    <div class="ctrl-group">
+                        <label data-i18n="ui.rightSidebar.discoveredProps">Discovered Properties</label>
+                        <div id="inspectorPropertyList" class="inspector-hint-block"><span class="sidebar-hint-text" data-i18n="ui.rightSidebar.analyzeFirst">Click “Analyze” first</span></div>
+                        <button type="button" id="inspectorAnalyzePropertiesBtn" class="btn btn-xs btn-block btn-icon btn-icon--inspector-full" data-i18n-title="ui.rightSidebar.findProperties" data-i18n-aria="ui.rightSidebar.findProperties">
+                            <i class="fas fa-search" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.findProperties">Find properties</span>
+                        </button>
+                    </div>
+                    <div class="ctrl-group">
+                        <label data-i18n="ui.rightSidebar.selectedFeature">Selected Feature</label>
+                        <div id="inspectorFeatureInfo" class="inspector-hint-block"><span class="sidebar-hint-text" data-i18n="ui.rightSidebar.clickFeatureHint">Click a feature in the 3D view</span></div>
+                    </div>
+                    <div class="ctrl-group">
+                        <label data-i18n="ui.rightSidebar.styleByProperty">Style by Property</label>
+                        <select id="inspectorStyleProperty" class="select-input inspector-style-select">
+                            <option value="" data-i18n="ui.rightSidebar.selectPropertyPlaceholder">Select property…</option>
+                        </select>
+                        <div class="ctrl-row rs-inspector-style-actions">
+                            <button type="button" id="inspectorApplyStyleBtn" class="btn btn-xs btn-primary btn-icon btn-icon--inspector" data-i18n-title="ui.rightSidebar.applyStyleTitle" data-i18n-aria="ui.rightSidebar.applyStyleTitle"><i class="fas fa-palette" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.applyStyleShort">Apply style</span></button>
+                            <button type="button" id="inspectorResetStyleBtn" class="btn btn-xs btn-icon btn-icon--inspector" data-i18n-title="ui.rightSidebar.resetStyleTitle" data-i18n-aria="ui.rightSidebar.resetStyleTitle"><i class="fas fa-undo" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.resetStyleShort">Reset style</span></button>
+                        </div>
+                    </div>
+                    <div class="ctrl-group">
+                        <label data-i18n="ui.rightSidebar.inspectorExportGroup">Export</label>
+                        <div class="ctrl-row rs-inspector-export-actions">
+                            <button type="button" id="inspectorExportFeaturesBtn" class="btn btn-xs btn-icon btn-icon--inspector" data-i18n-title="ui.rightSidebar.exportFeaturesTitle" data-i18n-aria="ui.rightSidebar.exportFeaturesTitle"><i class="fas fa-download" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.exportFeaturesShort">Export features</span></button>
+                            <button type="button" id="inspectorExportPropertiesBtn" class="btn btn-xs btn-icon btn-icon--inspector" data-i18n-title="ui.rightSidebar.exportPropertiesTitle" data-i18n-aria="ui.rightSidebar.exportPropertiesTitle"><i class="fas fa-clipboard" aria-hidden="true"></i><span class="visually-hidden" data-i18n="ui.rightSidebar.exportPropertiesShort">Export properties</span></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </aside>
+
+</div><!-- /.main-container -->
+
+<!-- ══════════════════════════════════════════════════════════
+     STATUS BAR
+══════════════════════════════════════════════════════════ -->
+<footer class="status-bar" id="statusBar" role="contentinfo" data-i18n-aria="ui.status.aria">
+    <div class="status-bar__inner">
+        <button type="button" class="status-bar-fold-btn" id="statusBarFoldBtn" aria-expanded="true" aria-controls="statusBarContent" data-i18n-title="app.collapseStatusBar">
+            <i class="fas fa-chevron-down status-bar-fold-icon" aria-hidden="true"></i>
+            <span class="visually-hidden" data-i18n="app.collapseStatusBar">Collapse status bar</span>
+        </button>
+        <div class="status-bar-content" id="statusBarContent">
+            <div class="status-bar-grid">
+                <section class="status-panel status-panel--message" aria-labelledby="statusKey">
+                    <div class="status-panel__head">
+                        <span class="status-key" id="statusKey" data-i18n="ui.status.statusKey">Status</span>
+                    </div>
+                    <div class="status-panel__body">
+                        <span id="statusText" class="status-value status-value--message" role="status" aria-live="polite" data-i18n="app.statusDefault">Ready</span>
+                    </div>
+                </section>
+                <section class="status-panel status-panel--coords" aria-labelledby="coordKey">
+                    <div class="status-panel__head">
+                        <span class="status-key" id="coordKey" data-i18n="ui.status.cursorKey">Cursor</span>
+                    </div>
+                    <div class="status-panel__body status-panel__body--coords">
+                        <div id="mouseCoordinates" class="status-value status-value--coords status-coords-empty" data-i18n-title="ui.status.cursorTitle">—</div>
+                    </div>
+                </section>
+                <section class="status-panel status-panel--metrics" aria-labelledby="statusMetricsHeading">
+                    <div class="status-panel__head status-panel__head--metrics">
+                        <span class="status-key status-key--metrics" id="statusMetricsHeading" data-i18n="ui.status.sceneHeading">Scene</span>
+                    </div>
+                    <div class="status-panel__body status-metrics-row" role="group" data-i18n-aria="ui.status.statsAria">
+                        <div class="status-metric" data-i18n-title="ui.status.tilesTitle">
+                            <span class="status-key" data-i18n="ui.status.tiles">Tiles</span>
+                            <span id="tileCount" class="status-num">0</span>
+                        </div>
+                        <div class="status-metric" data-i18n-title="ui.status.featuresTitle">
+                            <span class="status-key" data-i18n="ui.status.features">Features</span>
+                            <span id="featureCount" class="status-num">0</span>
+                        </div>
+                        <div class="status-metric status-metric--fps" data-i18n-title="ui.status.fpsTitle">
+                            <span class="status-key" data-i18n="ui.status.fps">FPS</span>
+                            <span id="fpsCounter" class="status-num status-num--fps">—</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<!-- Directions — geodesic distance / bearing + path on globe -->
+<div id="directionsModal" class="modal directions-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="directionsHeading">
+    <div class="modal-content directions-modal-content">
+        <div class="modal-header">
+            <h2 id="directionsHeading"><i class="fas fa-route" aria-hidden="true"></i> <span data-i18n="ui.nav.directions">Directions</span></h2>
+            <button type="button" class="close-btn" id="directionsCloseBtn" data-i18n-aria="ui.directions.closeAria">×</button>
+        </div>
+        <div class="directions-body">
+            <p class="directions-lead" data-i18n-html="ui.directions.lead"></p>
+            <div class="directions-grid">
+                <div class="directions-col">
+                    <h3 class="directions-sub" data-i18n="ui.directions.start">Start</h3>
+                    <label class="directions-field"><span data-i18n="ui.directions.lat">Latitude</span><input type="text" id="directionsFromLat" inputmode="decimal" data-i18n-placeholder="ui.directions.fromLatPh" placeholder="e.g. 31.78" autocomplete="off"/></label>
+                    <label class="directions-field"><span data-i18n="ui.directions.lon">Longitude</span><input type="text" id="directionsFromLon" inputmode="decimal" data-i18n-placeholder="ui.directions.fromLonPh" placeholder="e.g. 35.22" autocomplete="off"/></label>
+                </div>
+                <div class="directions-col">
+                    <h3 class="directions-sub" data-i18n="ui.directions.end">End</h3>
+                    <label class="directions-field"><span data-i18n="ui.directions.lat">Latitude</span><input type="text" id="directionsToLat" inputmode="decimal" data-i18n-placeholder="ui.directions.toLatPh" placeholder="e.g. 32.07" autocomplete="off"/></label>
+                    <label class="directions-field"><span data-i18n="ui.directions.lon">Longitude</span><input type="text" id="directionsToLon" inputmode="decimal" data-i18n-placeholder="ui.directions.toLonPh" placeholder="e.g. 34.78" autocomplete="off"/></label>
+                </div>
+            </div>
+            <div class="directions-actions">
+                <button type="button" class="btn btn-sm" id="directionsUseCursorBtn" data-i18n-title="ui.directions.useCursorTitle"><span data-i18n="ui.directions.useCursor">Use cursor</span></button>
+                <button type="button" class="btn btn-sm" id="directionsUseCameraBtn" data-i18n-title="ui.directions.useCameraTitle"><span data-i18n="ui.directions.useCamera">Camera</span></button>
+                <button type="button" class="btn btn-sm" id="directionsSwapBtn" data-i18n-title="ui.directions.swapTitle"><span data-i18n="ui.directions.swap">Swap</span></button>
+                <button type="button" class="btn btn-primary btn-sm" id="directionsComputeBtn" data-i18n="ui.directions.showPath">Show path &amp; measure</button>
+                <button type="button" class="btn btn-sm" id="directionsClearLineBtn" data-i18n="ui.directions.clearLine">Clear line</button>
+            </div>
+            <div class="directions-results" role="region" data-i18n-aria="ui.directions.resultsAria">
+                <div class="directions-result-row"><span class="directions-rk" data-i18n="ui.directions.geodesicDistance">Geodesic distance</span><span id="directionsDistanceOut" class="directions-rv">—</span></div>
+                <div class="directions-result-row"><span class="directions-rk" data-i18n="ui.directions.initialBearing">Initial bearing</span><span id="directionsBearingOut" class="directions-rv">—</span></div>
+                <div class="directions-result-row"><span class="directions-rk" data-i18n="ui.directions.cardinal">Cardinal</span><span id="directionsCardinalOut" class="directions-rv">—</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Share modal — all-tools.md §12, Map_Toolbar_Complete_Spec.md B.17 -->
+<div id="modalDiv" class="share-modal-simplex" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="shareModalHeading">
+    <div class="share-modal-inner">
+        <h2 id="shareModalHeading" class="visually-hidden" data-i18n="ui.share.heading">Share location</h2>
+        <button type="button" id="modalCloseBtn" class="share-modal-close" data-i18n-title="ui.share.closeTitle" data-i18n-aria="ui.share.closeAria">×</button>
+        <div id="modalMsg" class="share-modal-msg" role="status" aria-live="polite"></div>
+        <div class="share-modal-actions">
+            <button type="button" id="shareCopy" data-i18n-title="ui.share.copyTitle" data-i18n="ui.share.copy">Copy to clipboard</button>
+            <button type="button" id="shareOSM" data-i18n-title="ui.share.osmTitle" data-i18n="ui.share.osm">OpenStreetMap</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     DASHBOARD MODAL
+══════════════════════════════════════════════════════════ -->
+<div id="dashboardModal" class="modal dashboard-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="dashboardModalHeading">
+    <div class="modal-content dashboard-content">
+        <div class="modal-header dashboard-modal-header">
+            <h2 id="dashboardModalHeading" class="dashboard-modal-title"><i class="fas fa-th-large" aria-hidden="true"></i><span data-i18n="ui.dashboard.title">Dashboard</span></h2>
+            <button type="button" class="close-btn close-btn--icon" id="closeDashboardBtn" data-i18n-aria="ui.cc.closeAria" aria-label="Close"><i class="fas fa-times" aria-hidden="true"></i></button>
+        </div>
+        <div class="dashboard-tabs" role="tablist" aria-label="Dashboard sections">
+            <button type="button" role="tab" class="dashboard-tab-btn active" id="dashboardTab_overview" data-tab="overview" aria-selected="true" aria-controls="dashboardOverviewTab"><i class="fas fa-chart-pie" aria-hidden="true"></i><span data-i18n="ui.dashboard.tabOverview">Overview</span></button>
+            <button type="button" role="tab" class="dashboard-tab-btn" id="dashboardTab_paths" data-tab="paths" aria-selected="false" aria-controls="dashboardPathsTab"><i class="fas fa-route" aria-hidden="true"></i><span data-i18n="ui.dashboard.tabPaths">Paths</span></button>
+            <button type="button" role="tab" class="dashboard-tab-btn" id="dashboardTab_files" data-tab="files" aria-selected="false" aria-controls="dashboardFilesTab"><i class="fas fa-folder-open" aria-hidden="true"></i><span data-i18n="ui.dashboard.tabFiles">Files</span></button>
+            <button type="button" role="tab" class="dashboard-tab-btn" id="dashboardTab_jsonTree" data-tab="jsonTree" aria-selected="false" aria-controls="dashboardJsonTreeTab"><i class="fas fa-sitemap" aria-hidden="true"></i><span data-i18n="ui.dashboard.tabJsonTree">JSON Tree</span></button>
+            <button type="button" role="tab" class="dashboard-tab-btn" id="dashboardTab_settings" data-tab="settings" aria-selected="false" aria-controls="dashboardSettingsTab"><i class="fas fa-sliders-h" aria-hidden="true"></i><span data-i18n="ui.dashboard.tabSettings">Settings</span></button>
+        </div>
+        <div class="dashboard-tab-content active" id="dashboardOverviewTab" role="tabpanel" aria-labelledby="dashboardTab_overview"></div>
+        <div class="dashboard-tab-content" id="dashboardPathsTab" role="tabpanel" aria-labelledby="dashboardTab_paths"></div>
+        <div class="dashboard-tab-content" id="dashboardFilesTab" role="tabpanel" aria-labelledby="dashboardTab_files"></div>
+        <div class="dashboard-tab-content" id="dashboardJsonTreeTab" role="tabpanel" aria-labelledby="dashboardTab_jsonTree"></div>
+        <div class="dashboard-tab-content" id="dashboardSettingsTab" role="tabpanel" aria-labelledby="dashboardTab_settings"></div>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     DATABASE MODAL
+══════════════════════════════════════════════════════════ -->
+<div id="databaseModal" class="modal" style="display:none;">
+    <div class="modal-content database-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-database"></i><span data-i18n="ui.database.title">Tileset Database</span></h2>
+            <button type="button" class="close-btn" id="closeDatabaseBtn" data-i18n-aria="ui.cc.closeAria">×</button>
+        </div>
+        <div class="database-content-area"></div>
+    </div>
+</div>
+
+<!-- Control Center — runtime settings for all tools (see Guide tab) -->
+<div id="controlCenterModal" class="modal control-center-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="controlCenterHeading">
+    <div class="modal-content control-center-content">
+        <div class="modal-header control-center-modal-header">
+            <h2 id="controlCenterHeading" class="control-center-title"><i class="fas fa-sliders-h" aria-hidden="true"></i><span data-i18n="ui.cc.heading">Control Center</span></h2>
+            <button type="button" class="close-btn close-btn--icon" id="closeControlCenterBtn" data-i18n-aria="ui.cc.closeAria" aria-label="Close"><i class="fas fa-times" aria-hidden="true"></i></button>
+        </div>
+        <div class="control-center-toolbar" role="toolbar" aria-label="Control Center actions">
+            <div class="control-center-tabs" role="tablist" aria-label="Control Center sections">
+                <button type="button" role="tab" class="cc-tab-btn active" id="ccTab_guide" data-cc-tab="guide" aria-selected="true" aria-controls="ccPanel_guide"><i class="fas fa-map-signs" aria-hidden="true"></i><span data-i18n="ui.cc.tabGuide">Overview</span></button>
+                <button type="button" role="tab" class="cc-tab-btn" id="ccTab_performance" data-cc-tab="performance" aria-selected="false" aria-controls="ccPanel_performance"><i class="fas fa-tachometer-alt" aria-hidden="true"></i><span data-i18n="ui.cc.tabPerformance">Performance</span></button>
+                <button type="button" role="tab" class="cc-tab-btn" id="ccTab_features" data-cc-tab="features" aria-selected="false" aria-controls="ccPanel_features"><i class="fas fa-th-large" aria-hidden="true"></i><span data-i18n="ui.cc.tabFeatures">Workspace</span></button>
+                <button type="button" role="tab" class="cc-tab-btn" id="ccTab_scene" data-cc-tab="scene" aria-selected="false" aria-controls="ccPanel_scene"><i class="fas fa-globe-americas" aria-hidden="true"></i><span data-i18n="ui.cc.tabScene">Scene &amp; map</span></button>
+                <button type="button" role="tab" class="cc-tab-btn" id="ccTab_local" data-cc-tab="local" aria-selected="false" aria-controls="ccPanel_local"><i class="fas fa-user-cog" aria-hidden="true"></i><span data-i18n="ui.cc.tabLocal">Preferences</span></button>
+                <button type="button" role="tab" class="cc-tab-btn" id="ccTab_project" data-cc-tab="project" aria-selected="false" aria-controls="ccPanel_project"><i class="fas fa-project-diagram" aria-hidden="true"></i><span data-i18n="ui.cc.tabProject">Project</span></button>
+                <button type="button" role="tab" class="cc-tab-btn" id="ccTab_backup" data-cc-tab="backup" aria-selected="false" aria-controls="ccPanel_backup"><i class="fas fa-cloud-upload-alt" aria-hidden="true"></i><span data-i18n="ui.cc.tabBackup">Backup</span></button>
+            </div>
+            <label class="cc-search-label" for="ccGlobalSearch">
+                <span class="visually-hidden" data-i18n="ui.cc.filterHidden">Filter settings</span>
+                <i class="fas fa-search" aria-hidden="true"></i>
+                <input type="search" id="ccGlobalSearch" class="cc-search-input" data-i18n-placeholder="ui.cc.filterPlaceholder" placeholder="Filter…" autocomplete="off" />
+            </label>
+            <span class="control-center-toolbar-spacer" aria-hidden="true"></span>
+            <button type="button" class="btn btn-primary btn-sm cc-btn-icon-text" id="ccSaveAllBtn"><i class="fas fa-save" aria-hidden="true"></i><span data-i18n="ui.cc.saveAll">Save all</span></button>
+        </div>
+        <div class="control-center-body">
+            <div class="cc-panel active" id="ccPanel_guide" role="tabpanel" data-cc-panel="guide" aria-labelledby="ccTab_guide">
+                <div class="help-section">
+                    <h3 class="cc-guide-h"><i class="fas fa-info-circle" aria-hidden="true"></i><span data-i18n="ui.cc.guideWhatTitle">What this is</span></h3>
+                    <p data-i18n-html="ui.cc.guideWhatP1">Control Center is the single place to adjust <strong>every setting</strong> that the app exposes for tools, performance, UI, scene modes, the map toolbar, dashboard preferences, platform toggles, and SIM sensor defaults. Changes are saved to the browser (<code>localStorage</code> key <code>simplex_runtime_overrides_v1</code>) and merged at runtime over <code>public/data/config/app-config.json</code> and tileset <code>Project.Optional_tools</code>.</p>
+                    <p data-i18n-html="ui.cc.guideWhatP2">Use the <strong>Filter</strong> field in the header to narrow sections by keyword (tool id, “fog”, “layers”, etc.). <strong>Workspace</strong> covers the tool catalog, feature flags, layer defaults, theme, and top navigation visibility. <strong>Scene &amp; map</strong> groups analysis buttons, scene modes, and map-strip tools to match <code>smart3dToolbarWireup</code>.</p>
+                    <h4 class="cc-guide-h"><i class="fas fa-list-ol" aria-hidden="true"></i><span data-i18n="ui.cc.guideHowTitle">How to use</span></h4>
+                    <ol>
+                        <li data-i18n-html="ui.cc.guideHow1">Open each tab, adjust values, then click <strong>Save all</strong>. The viewer applies performance, <code>window.t</code> (toolbar visibility), chrome, and local prefs immediately.</li>
+                        <li data-i18n-html="ui.cc.guideHow2"><strong>Reset runtime overrides</strong> removes only Control Center stored data; reload the page to pick defaults from JSON files again.</li>
+                        <li data-i18n-html="ui.cc.guideHow3"><strong>Reset local prefs</strong> also clears Dashboard settings, platform controls, and SIM sensor keys — reload afterward.</li>
+                        <li data-i18n-html="ui.cc.guideHow4">Use <strong>Backup</strong> to export or import a JSON snapshot for the same machine or another profile.</li>
+                    </ol>
+                    <h4 class="cc-guide-h"><i class="fas fa-sitemap" aria-hidden="true"></i><span data-i18n="ui.cc.guideMapTitle">Where things map</span></h4>
+                    <ul>
+                        <li data-i18n-html="ui.cc.guideMapPerf"><strong>Performance</strong> — <code>jsonConfigManager</code> / <code>renderLoopManager</code> / <code>tilesetViewer.applyDisplayPerformanceSettings</code>.</li>
+                        <li data-i18n-html="ui.cc.guideMapApp"><strong>App &amp; tools</strong> — <code>tools.items</code> (toolbar catalog), <code>modules.*</code> (runtime init; synced with catalog on save), <code>features.*</code>, <code>ui.*</code>.</li>
+                        <li data-i18n-html="ui.cc.guideMapAppearance"><strong>Appearance</strong> — <code>ui.theme</code> (light/dark body theme), <code>ui.sidebars</code> (left/right collapse, optional minimized bottom tool strip), <code>ui.chrome</code> (top bar buttons).</li>
+                        <li data-i18n-html="ui.cc.guideMapScene"><strong>Scene &amp; toolbar</strong> — <code>Project.Optional_tools</code> → <code>window.t</code>; drives sub-toolbar and tool strip via <code>smart3dToolbarWireup</code>.</li>
+                        <li data-i18n-html="ui.cc.guideMapLocal"><strong>Local prefs</strong> — <code>appSettings</code>, <code>platformControlsSettings</code>, <code>simSensorConfig</code>.</li>
+                    </ul>
+                    <p class="help-note" data-i18n-html="ui.cc.guideNote1">File on disk (<code>app-config.json</code>) is not overwritten from here. For permanent project defaults, edit that file or export from Backup and merge manually.</p>
+                    <p class="help-note" data-i18n-html="ui.cc.guideNote2"><strong>AppSettingsFramework</strong> (<code>js/core/appSettingsFramework.js</code>) registers every storage key, applies linked modules after <code>jsonConfigUpdated</code>, and powers full JSON export/import (version 2).</p>
+                    <p class="help-note" data-i18n-html="ui.cc.guideNote3">Open the <strong>Project</strong> tab for a complete first-party file list (every <code>public/js</code> module except vendor), storage-key registry, and how each area connects to settings.</p>
+                </div>
+            </div>
+            <div class="cc-panel" id="ccPanel_performance" role="tabpanel" aria-labelledby="ccTab_performance"></div>
+            <div class="cc-panel" id="ccPanel_features" role="tabpanel" aria-labelledby="ccTab_features"></div>
+            <div class="cc-panel" id="ccPanel_scene" role="tabpanel" aria-labelledby="ccTab_scene"></div>
+            <div class="cc-panel" id="ccPanel_local" role="tabpanel" aria-labelledby="ccTab_local"></div>
+            <div class="cc-panel" id="ccPanel_project" role="tabpanel" aria-labelledby="ccTab_project"></div>
+            <div class="cc-panel" id="ccPanel_backup" role="tabpanel" aria-labelledby="ccTab_backup">
+                <div class="cc-backup-section">
+                    <h3 class="cc-section-title"><i class="fas fa-file-export" aria-hidden="true"></i><span data-i18n="ui.cc.backupSectionTitle">Backup &amp; restore</span></h3>
+                    <p class="cc-lead" data-i18n-html="ui.cc.backupLead">Export includes merged app config, current optional-tools patch shape, and local preference blobs.</p>
+                    <div class="cc-backup-actions">
+                        <button type="button" class="btn btn-primary cc-btn-icon-text" id="ccExportBtn"><i class="fas fa-download" aria-hidden="true"></i><span data-i18n="ui.cc.exportJson">Export JSON</span></button>
+                        <button type="button" class="btn cc-btn-icon-text" id="ccImportBtn"><i class="fas fa-file-import" aria-hidden="true"></i><span data-i18n="ui.cc.importJson">Import JSON…</span></button>
+                        <input type="file" id="ccImportFile" accept="application/json,.json" class="visually-hidden" />
+                    </div>
+                </div>
+                <div class="cc-backup-danger">
+                    <div class="cc-subhead cc-danger-head"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span data-i18n="ui.cc.dangerZone">Danger zone</span></div>
+                    <p class="cc-lead cc-danger-lead" data-i18n-html="ui.cc.dangerLead">Resets only affect browser storage, not your repo files.</p>
+                    <div class="cc-backup-actions cc-backup-actions--stack">
+                        <button type="button" class="btn cc-btn-icon-text" id="ccResetRuntimeBtn"><i class="fas fa-undo-alt" aria-hidden="true"></i><span data-i18n="ui.cc.resetRuntime">Reset runtime overrides</span></button>
+                        <button type="button" class="btn btn-danger-outline cc-btn-icon-text" id="ccResetAllPrefsBtn"><i class="fas fa-eraser" aria-hidden="true"></i><span data-i18n="ui.cc.resetAllPrefs">Reset runtime + all local prefs</span></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     SCRIPTS — load order preserved exactly from original
+══════════════════════════════════════════════════════════ -->
+<script src="js/utils/logger.js"></script>
+<script src="js/utils/errorHandler.js"></script>
+<script src="js/utils/pathResolver.js"></script>
+<script src="js/utils/fileHandleRegistry.js"></script>
+<script src="js/utils/notification.js"></script>
+<script src="js/utils/safePickPosition.js"></script>
+<script src="js/core/toolManager.js"></script>
+<script src="js/core/unitHelpers.js"></script>
+    <script src="js/core/appI18n.locale-en.js"></script>
+    <script src="js/core/appI18n.locale-ar.js"></script>
+    <script src="js/core/appI18n.js"></script>
+    <script src="js/core/smart3dI18n.js"></script>
+    <script>
+        window.Lan = window.Lan || 'En';
+        window.uToken = typeof window.uToken === 'string' ? window.uToken : '';
+        window.ismobile = typeof window.ismobile === 'boolean' ? window.ismobile : false;
+    </script>
+    <script src="js/vendor/knockout-min.js"></script>
+    <script src="js/features/vshd.js"></script>
+<script src="js/utils/tilesetDatabase.js"></script>
+<script src="js/utils/nestedToolbarManager.js"></script>
+<script src="js/utils/inputValidator.js"></script>
+<script src="js/utils/featurePickingUtils.js"></script>
+<script src="js/utils/cesiumCanvasPointer.js"></script>
+
+<script>
+(function() {
+    const debugPanel = document.getElementById('buttonDebugPanel');
+    if (debugPanel) debugPanel.remove();
+    if (window.buttonDebugger) delete window.buttonDebugger;
+    if (window.buttonIntegrationTester) delete window.buttonIntegrationTester;
+})();
+</script>
+
+<script src="js/utils/initializationManager.js"></script>
+<script src="js/utils/simUtils.js"></script>
+<script src="js/ui/uiLayerStack.js"></script>
+<script src="js/core/renderLoopManager.js"></script>
+<script src="js/core/pathManager.js"></script>
+<script src="js/core/fileManager.js"></script>
+<script src="js/core/fileEditor.js"></script>
+<script src="js/core/tilesetProcessor.js"></script>
+<script src="js/core/jsonConfigManager.js"></script>
+<script src="js/core/moduleRuntimeGate.js"></script>
+<script src="js/core/appSettingsFramework.js"></script>
+<script src="js/core/projectIntegrationIndex.js"></script>
+<script src="js/core/controlGovernance.js"></script>
+<script src="js/ui/viewRangeToolbarInject.js"></script>
+    <script src="js/ui/smart3dToolbarWireup.js"></script>
+    <script src="js/ui/sceneModesParameterPanel.js"></script>
+    <script src="js/core/tilesetViewer.js"></script>
+<script src="js/ui/offlineRasterSourceUI.js"></script>
+<script src="js/features/tileInspector.js"></script>
+<script src="js/features/tileHierarchyLayersOverlay.js"></script>
+<script src="js/features/metadata.js"></script>
+<script src="js/features/jsonTree.js"></script>
+<script src="js/features/displayControl.js"></script>
+<script src="js/features/tilePositioning.js"></script>
+<script src="lib/xlsx/xlsx.full.min.js"></script>
+<script src="js/features/featureManager.js"></script>
+<script src="js/features/regions.js"></script>
+<script src="js/utils/coordinateConverter.js"></script>
+<script src="js/features/coordinateManager.js"></script>
+<script src="js/features/directionsManager.js"></script>
+<script src="js/features/coordinateResearchManager.js"></script>
+<script src="js/navigation/navigationManager.js"></script>
+<script src="js/features/mapCompassManager.js"></script>
+<script src="js/tools/viewControls.js"></script>
+<script src="js/ui/dashboardUI.js"></script>
+<script src="js/ui/controlCenterRegistry.js"></script>
+<script src="js/ui/comprehensiveSettingsUI.js"></script>
+<script src="js/ui/displayControlUI.js"></script>
+<script src="js/ui/featureManagerUI.js"></script>
+<script src="js/ui/regionsManagerUI.js"></script>
+<script src="js/ui/databaseUI.js"></script>
+<script src="js/ui/pathInputUI.js"></script>
+<script src="js/ui/floatingControlsUI.js"></script>
+<script src="js/ui/navigationHelpUI.js"></script>
+<script src="js/ui/helpUI.js"></script>
+<script src="js/ui/tileInspectorUI.js"></script>
+<script src="js/ui/platformControlsUI.js"></script>
+<script src="js/ui/toolbarManager.js"></script>
+<script src="js/ui/frontendIntegration.js"></script>
+<script src="js/features/searchManager.js"></script>
+<script src="js/features/modelsMapManager.js"></script>
+<script src="js/features/bookmarkManager.js"></script>
+<script src="js/features/shareLocationManager.js"></script>
+<script src="js/features/layersMenuManager.js"></script>
+<script src="js/features/screenshotManager.js"></script>
+<script src="js/features/enhancedMeasurementManager.js"></script>
+<script src="js/features/shadeAnalysisManager.js"></script>
+<script src="js/features/featureInteractionManager.js"></script>
+<script src="js/features/lineOfSightManager.js"></script>
+<script src="js/features/visibleHiddenAreasManager.js"></script>
+<script src="js/features/streetViewManager.js"></script>
+<script src="js/features/cutByPolygonManager.js"></script>
+<script src="js/features/splitScreenManager.js"></script>
+<script src="js/features/displayModesManager.js"></script>
+<script src="js/features/supermanFlightModeManager.js"></script>
+<script src="js/features/obliqueViewsManager.js"></script>
+<script src="js/features/modelAndLayerUploadManager.js"></script>
+<script src="js/features/simVisualToolsBridge.js"></script>
+<script src="js/ui/ionSdkToolsFacade.js"></script>
+<script src="js/features/simIntegrationManager.js"></script>
+<script src="js/gis/projectManager.js"></script>
+<script src="js/gis/layerStore.js"></script>
+<script src="js/gis/layerRenderingQuality.js"></script>
+<script src="js/features/dataLayerIntegration.js"></script>
+<script src="js/gis/layerRuntime.js"></script>
+<script src="js/gis/editingManager.js"></script>
+<script src="js/gis/geoprocessingUI.js"></script>
+<script src="js/gis/rasterSamplingManager.js"></script>
+<script src="js/gis/offlineStatusUI.js"></script>
+<script src="js/gis/labelQueryService.js"></script>
+<script src="js/gis/labelCollisionEngine.js"></script>
+<script src="js/gis/labelManager.js"></script>
+<script src="js/ui/labelManagerUI.js"></script>
+
+<!-- Initialization -->
+<script>
+(function() {
+    const initWhenReady = () => {
+        const waitForInitManager = (maxAttempts, attempt) => {
+            maxAttempts = maxAttempts || 20;
+            attempt = attempt || 0;
+            const initManager = window.initializationManager;
+            if (initManager && typeof initManager.addCritical === 'function') {
+                initializeApp(initManager);
+            } else if (attempt < maxAttempts) {
+                setTimeout(() => waitForInitManager(maxAttempts, attempt + 1), attempt === 0 ? 100 : 50);
+            } else {
+                console.warn('InitializationManager not available, using fallback');
+                if (window.app && typeof window.app.init === 'function') window.app.init();
+            }
+        };
+        waitForInitManager();
+    };
+
+    const initializeApp = (initManager) => {
+        initManager.addCritical(async () => {
+            if (window.pathResolver && window.fileHandleRegistry)
+                await window.pathResolver.init(window.fileHandleRegistry);
+        }, 'pathResolver');
+
+        initManager.addCritical(async () => {
+            if (window.jsonConfigManager) await window.jsonConfigManager.init();
+        }, 'jsonConfigManager');
+
+        initManager.addCritical(() => {
+            if (window.fileManager && window.pathResolver && window.fileHandleRegistry)
+                window.fileManager.init(window.fileHandleRegistry, window.pathResolver);
+        }, 'fileManager');
+
+        initManager.addCritical(() => {
+            if (window.fileEditor && window.fileManager) window.fileEditor.init(window.fileManager);
+        }, 'fileEditor');
+
+        initManager.addCritical(() => {
+            if (window.tilesetViewer && window.pathResolver && window.fileHandleRegistry)
+                window.tilesetViewer.initDependencies(window.pathResolver, window.fileHandleRegistry);
+        }, 'tilesetViewer-deps');
+
+        initManager.addNormal(() => {
+            if (window.displayControl) window.displayControl.init();
+            if (window.tilePositioning) window.tilePositioning.init();
+            if (window.featureManager) window.featureManager.init();
+            if (window.regionsManager) window.regionsManager.init();
+            if (window.navigationManager) window.navigationManager.init();
+            if (window.viewControls) window.viewControls.init();
+            if (window.tilesetDatabase) window.tilesetDatabase.init();
+        }, 'core-modules');
+
+        initManager.addNormal(() => {
+            if (window.dashboardUI) window.dashboardUI.init();
+            if (window.comprehensiveSettingsUI) window.comprehensiveSettingsUI.init();
+            if (window.displayControlUI) window.displayControlUI.init();
+            if (window.featureManagerUI) window.featureManagerUI.init();
+            if (window.regionsManagerUI) window.regionsManagerUI.init();
+            if (window.databaseUI) window.databaseUI.init();
+            if (window.pathInputUI && !window.pathInputUI.initialized) window.pathInputUI.init();
+            if (window.floatingControlsUI) window.floatingControlsUI.init();
+            if (window.toolbarManager) window.toolbarManager.init();
+            if (window.navigationHelpUI) window.navigationHelpUI.init();
+            if (window.helpUI) window.helpUI.init();
+            if (window.platformControlsUI) window.platformControlsUI.init();
+        }, 'ui-modules');
+
+        initManager.addCritical(() => {
+            if (window.frontendIntegration) {
+                return window.frontendIntegration.init().catch(err => {
+                    if (window.errorHandler) window.errorHandler.handle(err, { component: 'FrontendIntegration', action: 'initialize' });
+                });
+            }
+        }, 'frontendIntegration');
+
+        const initMod = (key, fn) => {
+            if (window.moduleRuntimeGate && !window.moduleRuntimeGate.shouldInitModule(key)) return;
+            fn();
+        };
+        initManager.addNormal(() => {
+            initMod('searchManager', () => window.searchManager?.init());
+            initMod('modelsMapManager', () => window.modelsMapManager?.init());
+            initMod('shareLocationManager', () => window.shareLocationManager?.init());
+            initMod('layersMenuManager', () => window.layersMenuManager?.init());
+            initMod('shadeAnalysisManager', () => window.shadeAnalysisManager?.init());
+            initMod('coordinateResearchManager', () => window.coordinateResearchManager?.init());
+            initMod('splitScreenManager', () => window.splitScreenManager?.init());
+            initMod('streetViewManager', () => window.streetViewManager?.init());
+            initMod('simVisualToolsBridge', () => window.simVisualToolsBridge?.init());
+            initMod('simIntegrationManager', () => window.simIntegrationManager?.init());
+            initMod('projectManager', () => window.projectManager?.init());
+            initMod('geoprocessingUI', () => window.geoprocessingUI?.init());
+            initMod('offlineStatusUI', () => window.offlineStatusUI?.init());
+        }, 'feature-managers');
+
+        initManager.addDeferred(async () => {
+            await initManager.waitForViewer();
+            initMod('tileInspectorUI', () => window.tileInspectorUI?.init());
+            initMod('bookmarkManager', () => window.bookmarkManager?.init());
+            initMod('screenshotManager', () => window.screenshotManager?.init());
+            initMod('enhancedMeasurementManager', () => window.enhancedMeasurementManager?.init());
+            initMod('lineOfSightManager', () => window.lineOfSightManager?.init());
+            initMod('visibleHiddenAreasManager', () => window.visibleHiddenAreasManager?.init());
+            if (window.smart3dToolbarWireup && typeof window.smart3dToolbarWireup.init === 'function') {
+                window.smart3dToolbarWireup.init();
+            }
+            if (window.mapCompassManager && typeof window.mapCompassManager.init === 'function') {
+                window.mapCompassManager.init();
+            }
+            initMod('cutByPolygonManager', () => window.cutByPolygonManager?.init());
+            initMod('displayModesManager', () => window.displayModesManager?.init());
+            initMod('supermanFlightModeManager', () => window.supermanFlightModeManager?.init());
+            initMod('obliqueViewsManager', () => window.obliqueViewsManager?.init());
+            initMod('modelAndLayerUploadManager', () => window.modelAndLayerUploadManager?.init());
+            initMod('coordinateManager', () => window.coordinateManager?.init());
+            initMod('featureInteractionManager', () => window.featureInteractionManager?.init());
+
+            (function wireLabelManagerSectionVisibility() {
+                function syncLabelManagerSectionVisibility() {
+                    const section = document.getElementById('labelManagerSection');
+                    if (!section) return;
+                    const gate = window.moduleRuntimeGate;
+                    const enabled =
+                        !gate ||
+                        typeof gate.shouldInitModule !== 'function' ||
+                        gate.shouldInitModule('labelManager');
+                    if (!enabled) {
+                        section.style.display = 'none';
+                        section.setAttribute('aria-hidden', 'true');
+                        if (window.labelManager && typeof window.labelManager.destroy === 'function') {
+                            window.labelManager.destroy();
+                        }
+                        if (window.labelManagerUI && typeof window.labelManagerUI.unmount === 'function') {
+                            window.labelManagerUI.unmount();
+                        }
+                        return;
+                    }
+                    section.style.display = '';
+                    section.setAttribute('aria-hidden', 'false');
+                }
+
+                function tryInitLabelManagerIfNeeded() {
+                    const gate = window.moduleRuntimeGate;
+                    if (
+                        !gate ||
+                        typeof gate.shouldInitModule !== 'function' ||
+                        !gate.shouldInitModule('labelManager')
+                    ) {
+                        return;
+                    }
+                    const viewer = window.tilesetViewer && window.tilesetViewer.viewer;
+                    const lmMount = document.getElementById('labelManagerMount');
+                    if (!viewer || !lmMount || !window.labelManagerUI || !window.labelManager) return;
+                    if (window.labelManager.isInitialized && window.labelManager.isInitialized()) return;
+                    window.labelManagerUI.mount(lmMount);
+                    window.labelManager.init(viewer);
+                }
+
+                syncLabelManagerSectionVisibility();
+                window.addEventListener('jsonConfigUpdated', () => {
+                    syncLabelManagerSectionVisibility();
+                    tryInitLabelManagerIfNeeded();
+                });
+
+                initMod('labelManager', () => {
+                    syncLabelManagerSectionVisibility();
+                    const lmMount = document.getElementById('labelManagerMount');
+                    if (window.labelManagerUI && lmMount) {
+                        window.labelManagerUI.mount(lmMount);
+                    }
+                    if (window.labelManager && window.tilesetViewer && window.tilesetViewer.viewer) {
+                        window.labelManager.init(window.tilesetViewer.viewer);
+                    }
+                });
+            })();
+        }, 'viewer-dependent-modules');
+
+        initManager.addNormal(() => {
+            // Collapsible section toggles
+            const syncSectionAria = (section) => {
+                const t = section?.querySelector?.('.s-toggle');
+                if (!t) return;
+                const collapsed = section.classList.contains('collapsed');
+                t.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            };
+            document.querySelectorAll('.collapsible-section').forEach((section) => syncSectionAria(section));
+            document.querySelectorAll('.s-toggle').forEach((toggle) => {
+                toggle.addEventListener('click', () => {
+                    const section = toggle.closest('.collapsible-section');
+                    if (!section) return;
+                    section.classList.toggle('collapsed');
+                    syncSectionAria(section);
+                });
+            });
+
+            // Sidebar toggles are handled in app.setupEventHandlers (single toggle for open/close)
+
+            /* Navbar / sidebar primary actions: FrontendIntegration.connectButton (single wiring). */
+            /* Modal close: App.hideDashboard / hideDatabase */
+
+            // Event bus — aligns with jsonConfigManager tools[].action and NestedToolbarManager
+            window.addEventListener('nestedToolbarItemClick', (e) => {
+                const a = e.detail?.action;
+                const w = window.smart3dToolbarWireup;
+                if (w && typeof w.invokeMapToolActionByNestedAlias === 'function') {
+                    w.invokeMapToolActionByNestedAlias(a);
+                }
+                const nm = window.navigationManager;
+                const extra = {
+                    flyAround: () => nm?.flyAround?.(),
+                    bookmarks: () => {
+                        const b = window.bookmarkManager;
+                        if (b?.toggleGallery) b.toggleGallery();
+                        else if (b?.showGallery) b.showGallery();
+                        else b?.show?.();
+                    },
+                    search: () => window.searchManager?.show?.(),
+                    modelsMap: () => window.modelsMapManager?.show?.(),
+                    shadeAnalysis: () => window.shadeAnalysisManager?.show?.(),
+                    flightMode: () => window.supermanFlightModeManager?.show?.(),
+                    obliqueViews: () => window.obliqueViewsManager?.show?.(),
+                    modelUpload: () => window.modelAndLayerUploadManager?.show?.(),
+                    mapLabels: () => window.labelManagerUI?.focusPanel?.()
+                };
+                if (a && typeof extra[a] === 'function') extra[a]();
+            });
+
+        }, 'event-listeners');
+
+        initManager.init();
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWhenReady);
+    } else {
+        setTimeout(initWhenReady, 0);
+    }
+})();
+</script>
+
+<script src="js/app.js"></script>
+
+<script>
+(function() {
+    function simplexDiagEnabled() {
+        try {
+            if (window.location.search.indexOf('debug=1') !== -1) return true;
+            if (localStorage.getItem('simplex_debug') === '1') return true;
+            if (window.electronAPI && window.electronAPI.isDev === true) return true;
+        } catch (e) {}
+        return false;
+    }
+    if (!simplexDiagEnabled()) return;
+    const checkModules = () => {
+        const modules = { logger: !!window.logger, errorHandler: !!window.errorHandler, notification: !!window.notification, tilesetViewer: !!window.tilesetViewer, toolbarManager: !!window.toolbarManager, frontendIntegration: !!window.frontendIntegration, app: !!window.app };
+        console.log('=== Module Check ===');
+        Object.entries(modules).forEach(([n,v]) => console.log(`  ${v?'✓':'✗'} ${n}: ${v?'LOADED':'MISSING'}`));
+        if (!Object.values(modules).every(Boolean)) {
+            const b = Array.from(document.scripts).filter(s => s.src?.includes('bundle.'));
+            if (!b.length) console.error('Bundle script not found');
+        } else { console.log('All critical modules loaded'); }
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(checkModules, 500));
+    else setTimeout(checkModules, 500);
+    window.addEventListener('load', () => setTimeout(() => { if (!window.app) setTimeout(() => { if (!window.app) console.error('App failed to initialize after 2s'); }, 1500); }, 500));
+})();
+</script>
+
+</body>
+</html>

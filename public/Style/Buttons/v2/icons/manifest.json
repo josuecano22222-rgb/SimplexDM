@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "source": "Buttons/v2/all_buttons.svg",
+  "generated": "2026-04-07T01:41:53.826Z",
+  "note": "Standalone SVGs use fill currentColor on paths for theming. Toolbar CSS uses embedded copies with fixed fill.",
+  "icons": [
+    {
+      "symbolId": "transparency",
+      "file": "transparency.svg",
+      "fileBase": "transparency"
+    },
+    {
+      "symbolId": "fog",
+      "file": "fog.svg",
+      "fileBase": "fog"
+    },
+    {
+      "symbolId": "white2",
+      "file": "white-model.svg",
+      "fileBase": "white-model"
+    },
+    {
+      "symbolId": "slope",
+      "file": "slope.svg",
+      "fileBase": "slope"
+    },
+    {
+      "symbolId": "height",
+      "file": "height.svg",
+      "fileBase": "height"
+    },
+    {
+      "symbolId": "distance",
+      "file": "distance.svg",
+      "fileBase": "distance"
+    },
+    {
+      "symbolId": "direction",
+      "file": "direction.svg",
+      "fileBase": "direction"
+    },
+    {
+      "symbolId": "snow",
+      "file": "snow.svg",
+      "fileBase": "snow"
+    },
+    {
+      "symbolId": "clouds",
+      "file": "clouds.svg",
+      "fileBase": "clouds"
+    },
+    {
+      "symbolId": "ortho",
+      "file": "ortho.svg",
+      "fileBase": "ortho"
+    },
+    {
+      "symbolId": "remapColors",
+      "file": "remap-colors.svg",
+      "fileBase": "remap-colors"
+    },
+    {
+      "symbolId": "layers",
+      "file": "layers.svg",
+      "fileBase": "layers"
+    },
+    {
+      "symbolId": "home",
+      "file": "home.svg",
+      "fileBase": "home"
+    },
+    {
+      "symbolId": "gotoPrev",
+      "file": "goto-prev.svg",
+      "fileBase": "goto-prev"
+    },
+    {
+      "symbolId": "gotoNext",
+      "file": "goto-next.svg",
+      "fileBase": "goto-next"
+    },
+    {
+      "symbolId": "north",
+      "file": "north.svg",
+      "fileBase": "north"
+    },
+    {
+      "symbolId": "topView",
+      "file": "top-view.svg",
+      "fileBase": "top-view"
+    },
+    {
+      "symbolId": "share",
+      "file": "share.svg",
+      "fileBase": "share"
+    },
+    {
+      "symbolId": "printScreen",
+      "file": "print-screen.svg",
+      "fileBase": "print-screen"
+    },
+    {
+      "symbolId": "elevationProfile",
+      "file": "elevation-profile.svg",
+      "fileBase": "elevation-profile"
+    },
+    {
+      "symbolId": "streetView",
+      "file": "street-view.svg",
+      "fileBase": "street-view"
+    },
+    {
+      "symbolId": "cut",
+      "file": "cut.svg",
+      "fileBase": "cut"
+    },
+    {
+      "symbolId": "split",
+      "file": "split.svg",
+      "fileBase": "split"
+    },
+    {
+      "symbolId": "special_effects",
+      "file": "special-effects.svg",
+      "fileBase": "special-effects"
+    },
+    {
+      "symbolId": "los",
+      "file": "los.svg",
+      "fileBase": "los"
+    },
+    {
+      "symbolId": "viewshed2",
+      "file": "viewshed.svg",
+      "fileBase": "viewshed"
+    },
+    {
+      "symbolId": "measure",
+      "file": "measure.svg",
+      "fileBase": "measure"
+    },
+    {
+      "symbolId": "flight",
+      "file": "flight.svg",
+      "fileBase": "flight"
+    }
+  ]
+}

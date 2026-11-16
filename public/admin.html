@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:* http://127.0.0.1:* data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' http://localhost:* http://127.0.0.1:* data: blob:;">
+  <title>Meridian — Site Content Admin</title>
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#060810">
+  <script src="js/simplexThemeSync.js"></script>
+  <script>
+    if (window.simplexThemeSync) window.simplexThemeSync(null);
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --void:        #060810;
+      --base:        #080b14;
+      --surface:     #0d1120;
+      --raised:      #111827;
+      --elevated:    #162032;
+      --cyan:        #00b9ff;
+      --cyan-soft:   rgba(0,185,255,0.10);
+      --cyan-glow:   rgba(0,185,255,0.05);
+      --cyan-mid:    #0092d0;
+      --cyan-hi:     #40d0ff;
+      --ink-1:       #d4e4f8;
+      --ink-2:       #7090b8;
+      --ink-3:       #384e6c;
+      --line:        rgba(255,255,255,0.07);
+      --line-mid:    rgba(255,255,255,0.12);
+      --line-cyan:   rgba(0,185,255,0.25);
+      --green:       #1ec87e;
+      --green-soft:  rgba(30,200,126,0.09);
+      --amber:       #f5a624;
+      --amber-soft:  rgba(245,166,36,0.10);
+      --red:         #ff3354;
+      --red-soft:    rgba(255,51,84,0.09);
+      --nav-h:       56px;
+      --f-display:   'Syne', system-ui, sans-serif;
+      --f-ui:        'Syne', system-ui, sans-serif;
+      --f-data:      'DM Mono', ui-monospace, monospace;
+      --shadow:      0 8px 32px rgba(0,0,0,0.65), 0 2px 8px rgba(0,0,0,0.4);
+      --spring:      cubic-bezier(0.16, 1, 0.3, 1);
+      --ease:        cubic-bezier(0.22, 1, 0.36, 1);
+      --radius:      10px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+
+    body {
+      background: var(--void);
+      color: var(--ink-1);
+      font-family: var(--f-ui);
+      font-size: 13px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    /* Grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,185,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,185,255,0.02) 1px, transparent 1px);
+      background-size: 64px 64px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--line-mid); border-radius: 2px; }
+
+    /* ── TOP BAR ── */
+    .admin-topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      height: var(--nav-h);
+      background: rgba(6, 8, 16, 0.9);
+      backdrop-filter: blur(20px) saturate(1.4);
+      -webkit-backdrop-filter: blur(20px) saturate(1.4);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .admin-topbar::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0,185,255,0.5) 40%, rgba(0,185,255,0.7) 50%, rgba(0,185,255,0.5) 60%, transparent);
+      opacity: 0.5;
+    }
+
+    .admin-topbar-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      height: 100%;
+      padding: 0 28px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Brand */
+    .admin-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .admin-brand-mark {
+      width: 30px;
+      height: 30px;
+      background: linear-gradient(135deg, var(--cyan) 0%, var(--cyan-mid) 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 0 16px rgba(0,185,255,0.3);
+    }
+
+    .admin-brand-mark svg { width: 14px; height: 14px; }
+
+    .admin-brand-text {
+      display: flex;
+      flex-direction: column;
+      line-height: 1;
+    }
+
+    .admin-brand-name {
+      font-family: var(--f-display);
+      font-weight: 800;
+      font-size: 14.5px;
+      color: var(--ink-1);
+      letter-spacing: -0.03em;
+    }
+
+    .admin-brand-sub {
+      font-family: var(--f-data);
+      font-size: 9px;
+      color: var(--ink-3);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .admin-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      background: var(--cyan-soft);
+      border: 1px solid var(--line-cyan);
+      border-radius: 999px;
+      font-family: var(--f-data);
+      font-size: 9px;
+      font-weight: 500;
+      color: var(--cyan);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .admin-badge-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 6px var(--cyan);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    /* Nav actions */
+    .admin-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .admin-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--ink-2);
+      font-family: var(--f-ui);
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 8px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+
+    .admin-link:hover {
+      border-color: var(--line-cyan);
+      color: var(--cyan);
+      background: var(--cyan-glow);
+    }
+
+    .admin-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: var(--surface);
+      border: 1px solid var(--line-mid);
+      color: var(--ink-2);
+      font-family: var(--f-ui);
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      white-space: nowrap;
+    }
+
+    .admin-btn:hover {
+      border-color: var(--line-cyan);
+      color: var(--ink-1);
+      background: var(--raised);
+    }
+
+    .admin-btn-primary {
+      background: linear-gradient(135deg, var(--cyan) 0%, var(--cyan-mid) 100%);
+      border-color: transparent;
+      color: #040c18;
+      box-shadow: 0 4px 16px rgba(0,185,255,0.25);
+    }
+
+    .admin-btn-primary:hover {
+      border-color: transparent;
+      color: #040c18;
+      background: linear-gradient(135deg, var(--cyan-hi) 0%, var(--cyan) 100%);
+      box-shadow: 0 6px 24px rgba(0,185,255,0.4);
+      transform: translateY(-1px);
+    }
+
+    /* ── MAIN LAYOUT ── */
+    .admin-main {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 28px 80px;
+    }
+
+    /* ── PAGE HEADER ── */
+    .admin-page-header {
+      margin-bottom: 32px;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .admin-page-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--f-data);
+      font-size: 10px;
+      color: var(--cyan);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .admin-page-eyebrow::before {
+      content: '';
+      display: block;
+      width: 16px; height: 1px;
+      background: var(--cyan);
+      opacity: 0.6;
+    }
+
+    .admin-page-title {
+      font-family: var(--f-display);
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--ink-1);
+      margin: 0 0 8px;
+    }
+
+    .admin-page-desc {
+      font-size: 13px;
+      color: var(--ink-2);
+      line-height: 1.6;
+    }
+
+    .admin-page-desc code {
+      font-family: var(--f-data);
+      font-size: 11.5px;
+      color: var(--cyan);
+      background: var(--cyan-soft);
+      border: 1px solid rgba(0,185,255,0.15);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    /* ── STATUS BAR ── */
+    .admin-status-wrap {
+      margin-bottom: 20px;
+    }
+
+    .admin-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 16px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      font-family: var(--f-data);
+      font-size: 12px;
+      color: var(--ink-2);
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .admin-status.loading {
+      border-color: rgba(245,166,36,0.3);
+      background: var(--amber-soft);
+      color: var(--amber);
+    }
+
+    .admin-status.success {
+      border-color: rgba(30,200,126,0.3);
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
+    .admin-status.error {
+      border-color: rgba(255,51,84,0.3);
+      background: var(--red-soft);
+      color: var(--red);
+    }
+
+    .status-icon {
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    /* ── EDITOR CARD ── */
+    .admin-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .admin-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 22px;
+      background: var(--raised);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .admin-card-title {
+      font-family: var(--f-display);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--ink-1);
+    }
+
+    .admin-card-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .editor-action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--ink-3);
+      font-family: var(--f-data);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+
+    .editor-action-btn:hover {
+      border-color: var(--line-mid);
+      color: var(--ink-2);
+      background: var(--elevated);
+    }
+
+    /* Editor area */
+    .admin-editor-wrap {
+      position: relative;
+    }
+
+    .admin-editor-gutter {
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      width: 44px;
+      background: var(--raised);
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 0;
+      pointer-events: none;
+    }
+
+    .editor-line-num {
+      font-family: var(--f-data);
+      font-size: 10px;
+      color: var(--ink-4);
+      line-height: 1.8;
+      text-align: right;
+      padding: 0 8px;
+      width: 100%;
+      user-select: none;
+    }
+
+    #jsonEditor {
+      display: block;
+      width: 100%;
+      min-height: 420px;
+      padding: 16px 18px 16px 60px;
+      background: var(--void);
+      border: none;
+      color: var(--ink-1);
+      font-family: var(--f-data);
+      font-size: 12.5px;
+      line-height: 1.8;
+      resize: vertical;
+      outline: none;
+      transition: background 0.2s;
+      tab-size: 2;
+    }
+
+    #jsonEditor:focus {
+      background: #050710;
+      box-shadow: inset 0 0 0 1px rgba(0,185,255,0.1);
+    }
+
+    /* ── TOOLBAR BELOW EDITOR ── */
+    .admin-editor-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 18px;
+      background: var(--raised);
+      border-top: 1px solid var(--line);
+    }
+
+    .editor-meta {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .editor-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--f-data);
+      font-size: 10px;
+      color: var(--ink-3);
+      letter-spacing: 0.04em;
+    }
+
+    .editor-meta-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--cyan);
+      opacity: 0.6;
+    }
+
+    .editor-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* ── HELP PANEL ── */
+    .admin-help {
+      margin-top: 20px;
+      padding: 18px 20px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .admin-help-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--f-data);
+      font-size: 10px;
+      color: var(--cyan);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .help-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--ink-2);
+      line-height: 1.55;
+    }
+
+    .help-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .help-item:first-child { padding-top: 0; }
+
+    .help-item-icon {
+      width: 24px; height: 24px;
+      border-radius: 6px;
+      background: var(--raised);
+      border: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .help-item strong { color: var(--ink-1); font-weight: 600; }
+
+    .help-item code {
+      font-family: var(--f-data);
+      font-size: 11px;
+      color: var(--cyan);
+      background: var(--cyan-soft);
+      border: 1px solid rgba(0,185,255,0.15);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    /* ── SCHEMA REFERENCE ── */
+    .admin-schema {
+      margin-top: 20px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .admin-schema-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      background: var(--raised);
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .admin-schema-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--f-data);
+      font-size: 10px;
+      color: var(--ink-2);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .schema-chevron {
+      color: var(--ink-3);
+      font-size: 10px;
+      transition: transform 0.2s var(--spring);
+    }
+
+    .admin-schema-body {
+      padding: 16px 18px;
+      display: none;
+    }
+
+    .admin-schema-body.open { display: block; }
+
+    .schema-key {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-family: var(--f-data);
+      font-size: 11px;
+      color: var(--cyan);
+      background: var(--cyan-soft);
+      border: 1px solid rgba(0,185,255,0.15);
+      padding: 2px 7px;
+      border-radius: 5px;
+      margin: 3px 3px;
+    }
+
+    .schema-type {
+      font-size: 9px;
+      color: var(--ink-3);
+      letter-spacing: 0.04em;
+    }
+
+    .schema-desc {
+      font-size: 11.5px;
+      color: var(--ink-2);
+      margin-top: 10px;
+      line-height: 1.6;
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes slide-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .admin-card {
+      animation: slide-in 0.4s var(--spring) 0.1s both;
+    }
+
+    .admin-help { animation: slide-in 0.4s var(--spring) 0.2s both; }
+
+    html.simplex-light {
+      color-scheme: light;
+      --void: #f4f6fb;
+      --base: #eef2f7;
+      --surface: #ffffff;
+      --raised: #f8fafc;
+      --elevated: #ffffff;
+      --ink-1: #0f172a;
+      --ink-2: #475569;
+      --ink-3: #64748b;
+      --line: rgba(15, 23, 42, 0.1);
+      --line-mid: rgba(15, 23, 42, 0.14);
+      --line-cyan: rgba(0, 185, 255, 0.35);
+      --shadow: 0 8px 32px rgba(15, 23, 42, 0.1);
+      --cyan-soft: rgba(0, 185, 255, 0.12);
+      --cyan-glow: rgba(0, 185, 255, 0.06);
+      --green-soft: rgba(30, 200, 126, 0.12);
+      --amber-soft: rgba(245, 166, 36, 0.12);
+      --red-soft: rgba(255, 51, 84, 0.08);
+    }
+
+    html.simplex-light body::before {
+      background-image:
+        linear-gradient(rgba(0, 185, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 185, 255, 0.03) 1px, transparent 1px);
+    }
+
+    html.simplex-light .admin-topbar {
+      background: rgba(255, 255, 255, 0.94);
+    }
+
+    html.simplex-light .admin-brand-mark svg path:nth-child(1) {
+      stroke: #0f172a;
+    }
+
+    html.simplex-light .admin-brand-mark svg path:nth-child(2) {
+      stroke: rgba(15, 23, 42, 0.45);
+    }
+  </style>
+</head>
+<body>
+  <script>
+    if (window.simplexThemeSync) window.simplexThemeSync(document.body);
+  </script>
+
+  <!-- TOP BAR -->
+  <header class="admin-topbar">
+    <div class="admin-topbar-inner">
+      <div class="admin-brand">
+        <div class="admin-brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3L4 7.5V16.5L12 21L20 16.5V7.5L12 3Z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M12 3V12M12 12L4 7.5M12 12L20 7.5" stroke="rgba(255,255,255,0.5)" stroke-width="1" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="admin-brand-text">
+          <span class="admin-brand-name">Meridian</span>
+          <span class="admin-brand-sub">Reality Platform</span>
+        </div>
+        <div class="admin-badge">
+          <span class="admin-badge-dot"></span>
+          Site Content
+        </div>
+      </div>
+
+      <nav class="admin-actions">
+        <a class="admin-link" href="landing.html?admin=1">
+          ↗ View landing
+        </a>
+        <button class="admin-btn" id="reloadBtn" type="button">
+          ↺ Reload
+        </button>
+        <button class="admin-btn admin-btn-primary" id="saveBtn" type="button">
+          ✓ Save changes
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="admin-main">
+    <!-- Page Header -->
+    <div class="admin-page-header">
+      <div class="admin-page-eyebrow">Content Management</div>
+      <h1 class="admin-page-title">Editable site content</h1>
+      <p class="admin-page-desc">
+        This editor updates <code>data/site/site-content.json</code> through the local app server.
+        Changes are reflected live on the landing page after saving.
+      </p>
+    </div>
+
+    <!-- Status -->
+    <div class="admin-status-wrap">
+      <div class="admin-status" id="status">
+        <span class="status-icon">⌛</span>
+        <span id="statusText">Loading content…</span>
+      </div>
+    </div>
+
+    <!-- Editor Card -->
+    <div class="admin-card">
+      <div class="admin-card-header">
+        <span class="admin-card-title">JSON Editor — site-content.json</span>
+        <div class="admin-card-actions">
+          <button class="editor-action-btn" id="formatBtn" type="button">
+            ⊞ Format
+          </button>
+          <button class="editor-action-btn" id="collapseBtn" type="button">
+            ↕ Collapse all
+          </button>
+          <button class="editor-action-btn" id="copyBtn" type="button">
+            ⎘ Copy
+          </button>
+        </div>
+      </div>
+
+      <div class="admin-editor-wrap">
+        <div class="admin-editor-gutter" id="editorGutter" aria-hidden="true">
+          <div class="editor-line-num" id="lineNumbers">1</div>
+        </div>
+        <textarea id="jsonEditor" spellcheck="false" autocomplete="off"
+          placeholder="Loading JSON content…"
+          aria-label="JSON content editor"></textarea>
+      </div>
+
+      <div class="admin-editor-footer">
+        <div class="editor-meta">
+          <div class="editor-meta-item">
+            <span class="editor-meta-dot"></span>
+            <span id="charCount">0 chars</span>
+          </div>
+          <div class="editor-meta-item">
+            <span class="editor-meta-dot"></span>
+            <span id="lineCount">0 lines</span>
+          </div>
+          <div class="editor-meta-item" id="validStatus">
+            <span class="editor-meta-dot"></span>
+            <span>Validating…</span>
+          </div>
+        </div>
+        <div class="editor-actions">
+          <button class="admin-btn" id="reloadBtn2" type="button">↺ Reload</button>
+          <button class="admin-btn admin-btn-primary" id="saveBtn2" type="button">✓ Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Help Panel -->
+    <div class="admin-help">
+      <div class="admin-help-title">
+        ℹ Quick reference
+      </div>
+
+      <div class="help-item">
+        <div class="help-item-icon">🗂️</div>
+        <div>
+          <strong>Landing page content</strong> is under the <code>cesiumInspired</code> key.
+          Edit the <code>title</code>, <code>subtitle</code>, and <code>cards</code> array to update the feature section.
+        </div>
+      </div>
+
+      <div class="help-item">
+        <div class="help-item-icon">🖼️</div>
+        <div>
+          <strong>Images</strong> — use paths like <code>assets/mesh-triangles.svg</code> or add your own files under <code>public/assets/</code> and reference them here.
+        </div>
+      </div>
+
+      <div class="help-item">
+        <div class="help-item-icon">💾</div>
+        <div>
+          <strong>Saving</strong> — click <strong>Save changes</strong> or press <code>Ctrl+S</code>. The content is validated before writing. Invalid JSON will show an error.
+        </div>
+      </div>
+    </div>
+
+    <!-- Schema Reference (collapsible) -->
+    <div class="admin-schema">
+      <div class="admin-schema-header" id="schemaToggle">
+        <div class="admin-schema-title">⬡ Schema reference</div>
+        <span class="schema-chevron" id="schemaChevron">▼</span>
+      </div>
+      <div class="admin-schema-body" id="schemaBody">
+        <div>
+          <span class="schema-key">cesiumInspired <span class="schema-type">object</span></span>
+          <span class="schema-key">title <span class="schema-type">string</span></span>
+          <span class="schema-key">subtitle <span class="schema-type">string</span></span>
+          <span class="schema-key">cards <span class="schema-type">array</span></span>
+          <span class="schema-key">mesh <span class="schema-type">object</span></span>
+        </div>
+        <div class="schema-desc">
+          Each card in <code>cards</code> should have: <code>eyebrow</code>, <code>title</code>, <code>text</code>, and an optional <code>imgSrc</code>.
+          The <code>mesh</code> object has <code>title</code>, <code>body</code>, and <code>imgSrc</code>.
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // ── Sync reload/save buttons ──
+    const reloadBtns = [document.getElementById('reloadBtn'), document.getElementById('reloadBtn2')];
+    const saveBtns = [document.getElementById('saveBtn'), document.getElementById('saveBtn2')];
+    const statusEl = document.getElementById('status');
+    const statusText = document.getElementById('statusText');
+    const editor = document.getElementById('jsonEditor');
+    const charCount = document.getElementById('charCount');
+    const lineCount = document.getElementById('lineCount');
+    const validStatus = document.getElementById('validStatus');
+    const lineNumbers = document.getElementById('lineNumbers');
+
+    function setStatus(type, msg, icon) {
+      statusEl.className = 'admin-status ' + type;
+      statusEl.querySelector('.status-icon').textContent = icon || (
+        type === 'loading' ? '⌛' : type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ'
+      );
+      statusText.textContent = msg;
+    }
+
+    // Line numbers
+    function updateLineNums() {
+      const lines = editor.value.split('\n').length;
+      lineNumbers.innerHTML = Array.from({length: lines}, (_, i) => i + 1).join('<br>');
+      charCount.textContent = editor.value.length + ' chars';
+      lineCount.textContent = lines + ' lines';
+      validateJSON();
+    }
+
+    function validateJSON() {
+      const val = editor.value.trim();
+      if (!val) { validStatus.innerHTML = '<span class="editor-meta-dot"></span><span>Empty</span>'; return; }
+      try {
+        JSON.parse(val);
+        validStatus.innerHTML = '<span class="editor-meta-dot" style="background:var(--green)"></span><span style="color:var(--green)">Valid JSON ✓</span>';
+      } catch(e) {
+        validStatus.innerHTML = '<span class="editor-meta-dot" style="background:var(--red)"></span><span style="color:var(--red)">Invalid JSON ✗</span>';
+      }
+    }
+
+    editor.addEventListener('input', updateLineNums);
+    editor.addEventListener('scroll', () => {
+      document.getElementById('editorGutter').scrollTop = editor.scrollTop;
+    });
+
+    // Tab indentation
+    editor.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = editor.selectionStart, end = editor.selectionEnd;
+        editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
+        editor.selectionStart = editor.selectionEnd = start + 2;
+        updateLineNums();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveBtns[0].click();
+      }
+    });
+
+    // Format button
+    document.getElementById('formatBtn').addEventListener('click', () => {
+      try {
+        editor.value = JSON.stringify(JSON.parse(editor.value), null, 2);
+        updateLineNums();
+        setStatus('success', 'JSON formatted', '✓');
+      } catch(e) {
+        setStatus('error', 'Cannot format: ' + e.message, '✗');
+      }
+    });
+
+    // Copy button
+    document.getElementById('copyBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(editor.value).then(() => {
+        setStatus('success', 'Copied to clipboard', '⎘');
+        setTimeout(() => setStatus('', 'Ready', 'ℹ'), 2000);
+      });
+    });
+
+    // Schema toggle
+    document.getElementById('schemaToggle').addEventListener('click', () => {
+      const body = document.getElementById('schemaBody');
+      const chevron = document.getElementById('schemaChevron');
+      body.classList.toggle('open');
+      chevron.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : '';
+    });
+
+    // ── Wire up the original siteContentAdmin.js script ──
+    // The buttons below mirror the original #reloadBtn and #saveBtn behavior
+    // by delegating to the existing script logic via IDs it expects.
+    updateLineNums();
+  </script>
+
+  <!-- Original admin script — preserved exactly -->
+  <script src="js/siteContentAdmin.js"></script>
+</body>
+</html>

@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#060810">
+  <title>Meridian — The 3D Reality Planning Platform</title>
+  <script src="js/simplexThemeSync.js"></script>
+  <script>
+    if (window.simplexThemeSync) window.simplexThemeSync(null);
+  </script>
+  <link rel="stylesheet" href="css/landing.css">
+</head>
+<body>
+  <script>
+    if (window.simplexThemeSync) window.simplexThemeSync(document.body);
+  </script>
+
+  <!-- ══════════════════════════════════
+       TOP NAVIGATION
+  ══════════════════════════════════ -->
+  <nav class="top-navbar-landing" role="navigation">
+    <div class="navbar-container">
+      <a href="landing.html" class="logo-landing">
+        <div class="logo-mark">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3L4 7.5V16.5L12 21L20 16.5V7.5L12 3Z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M12 3V12M12 12L4 7.5M12 12L20 7.5" stroke="rgba(255,255,255,0.5)" stroke-width="1" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="logo-wordmark">
+          <span class="logo-name">Meridian</span>
+          <span class="logo-sub">Reality Planning Platform</span>
+        </div>
+      </a>
+
+      <div class="navbar-right">
+        <div class="language-selector">
+          <span class="lang-icon">🌐</span>
+          <select class="lang-select" aria-label="Select language">
+            <option value="en">English</option>
+            <option value="he">עברית (Hebrew)</option>
+          </select>
+        </div>
+        <a href="admin.html" class="admin-link" id="adminLink">Edit content</a>
+        <a href="#" class="nav-link" id="signInBtn">Sign In</a>
+        <a href="#demo" class="btn-primary-nav" id="bookDemoBtn">Book a demo</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ══════════════════════════════════
+       HERO SECTION
+  ══════════════════════════════════ -->
+  <section class="hero-section">
+    <div class="hero-content">
+      <div class="hero-eyebrow">
+        <span class="hero-eyebrow-dot"></span>
+        3D Reality Intelligence Platform
+      </div>
+
+      <h1 class="hero-title">
+        Visualize, plan &amp;<br>
+        build the future on a<br>
+        <span class="hero-title-accent">high-resolution 3D model</span><br>
+        of your reality
+      </h1>
+
+      <p class="hero-subtitle">
+        Stream city-scale 3D environments at 3cm per pixel resolution.
+        Plan with precision, collaborate in real time, and make decisions
+        grounded in reality.
+      </p>
+
+      <div class="hero-actions">
+        <a href="index.html" class="btn-hero" id="startCreatingBtn">
+          Start Creating
+          <span class="btn-hero-arrow">→</span>
+        </a>
+        <a href="#demo" class="btn-secondary-hero">
+          See it in action
+        </a>
+      </div>
+
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="hero-stat-value">3<span>cm</span></div>
+          <div class="hero-stat-label">Per Pixel</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-value">360<span>°</span></div>
+          <div class="hero-stat-label">Coverage</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-value">Real<span>-time</span></div>
+          <div class="hero-stat-label">Collaboration</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="hero-viewport">
+        <div class="hero-viewport-header">
+          <div class="vp-dots">
+            <span class="vp-dot"></span>
+            <span class="vp-dot"></span>
+            <span class="vp-dot"></span>
+          </div>
+          <span class="vp-title">SimplexDM · Tel Aviv</span>
+          <div class="vp-badge">
+            <span class="vp-badge-dot"></span>
+            Live
+          </div>
+        </div>
+
+        <div class="hero-viewport-body">
+          <div class="scene-grid"></div>
+          <div class="scene-buildings">
+            <div class="scene-building"></div>
+            <div class="scene-building"></div>
+            <div class="scene-building"></div>
+            <div class="scene-building"></div>
+            <div class="scene-building"></div>
+            <div class="scene-building"></div>
+            <div class="scene-building"></div>
+          </div>
+          <div class="scene-overlay"></div>
+          <div class="vp-scanline"></div>
+
+          <!-- Floating data chips -->
+          <div class="vp-chip">
+            <span class="vp-chip-dot"></span>
+            32.0856° N, 34.7818° E
+          </div>
+          <div class="vp-chip">
+            <span class="vp-chip-dot"></span>
+            Alt: 187.4m
+          </div>
+          <div class="vp-chip">
+            <span class="vp-chip-dot"></span>
+            3D Tiles: 2,847
+          </div>
+
+          <!-- Corner frames -->
+          <div class="vp-corner vp-corner-tl"></div>
+          <div class="vp-corner vp-corner-tr"></div>
+          <div class="vp-corner vp-corner-bl"></div>
+          <div class="vp-corner vp-corner-br"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════
+       CESIUM FEATURE SECTION
+  ══════════════════════════════════ -->
+  <section class="cesium-inspired-section" id="cesiumInspiredSection">
+    <div class="ci-container">
+      <div class="ci-header reveal">
+        <div class="section-label">3D Tiles Technology</div>
+        <h2 data-sc="cesiumInspired.title">Streaming 3D at city scale</h2>
+        <p data-sc="cesiumInspired.subtitle">A best-in-class 3D Tiles implementation — tuned for performance, precision, and interoperability.</p>
+      </div>
+
+      <div class="ci-grid" data-sc="cesiumInspired.cards">
+        <!-- Cards injected by siteContentClient.js -->
+        <!-- Fallback placeholder cards (hidden when JS loads) -->
+        <div class="ci-card reveal reveal-delay-1">
+          <div class="ci-card-media">
+            <div class="ci-card-placeholder">
+              <div class="ci-card-placeholder-inner">
+                <div class="ci-card-ph-cell"></div><div class="ci-card-ph-cell"></div>
+                <div class="ci-card-ph-cell"></div><div class="ci-card-ph-cell"></div>
+                <div class="ci-card-ph-cell"></div><div class="ci-card-ph-cell"></div>
+                <div class="ci-card-ph-cell"></div><div class="ci-card-ph-cell"></div>
+                <div class="ci-card-ph-cell"></div><div class="ci-card-ph-cell"></div>
+                <div class="ci-card-ph-cell"></div><div class="ci-card-ph-cell"></div>
+                <div class="ci-card-ph-cell"></div><div class="ci-card-ph-cell"></div>
+                <div class="ci-card-ph-cell"></div><div class="ci-card-ph-cell"></div>
+                <div class="ci-card-ph-cell"></div><div class="ci-card-ph-cell"></div>
+                <div class="ci-card-ph-cell"></div><div class="ci-card-ph-cell"></div>
+              </div>
+            </div>
+          </div>
+          <div class="ci-card-body">
+            <div class="ci-card-eyebrow">Streaming</div>
+            <h3 class="ci-card-title">City-Scale 3D Tiles</h3>
+            <p class="ci-card-text">Efficient tile streaming at any zoom level with adaptive LOD for maximum performance.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="ci-mesh reveal">
+        <img loading="lazy" decoding="async" src="assets/mesh-triangles.svg" alt="Mesh triangles overlay preview" data-sc="cesiumInspired.mesh" />
+        <div class="ci-mesh-body">
+          <h3 data-sc="cesiumInspired.mesh.title">Mesh triangles overlay (construction)</h3>
+          <p data-sc="cesiumInspired.mesh.body">
+            Inspect a mesh with triangle overlays to validate surface quality, density, and coverage over a construction site.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════
+       EXPLORE SECTION
+  ══════════════════════════════════ -->
+  <section class="explore-section">
+    <div class="section-wrapper">
+      <div class="reveal">
+        <div class="section-label">Navigation</div>
+        <h2 class="section-title">Now You Can Explore</h2>
+        <p class="section-subtitle">Navigation Through Dimensions — experience your world from every angle, height, and perspective.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card reveal reveal-delay-1">
+          <div class="feature-icon">360°</div>
+          <h4>360° 3D view</h4>
+          <p>Experience high-resolution 3D views at 3cm per pixel resolution from any angle, distance, and height</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-2">
+          <div class="feature-icon">📊</div>
+          <h4>Contextual data</h4>
+          <p>Urban context, transportation, zoning, financial – all the data you need, contextually integrated into one place</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-3">
+          <div class="feature-icon">📐</div>
+          <h4>Precise blueprints</h4>
+          <p>Achieve precise, levels of details on distance, height, slopes, footprint, roofs, and point-to-point</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════
+       CRAFT SECTION
+  ══════════════════════════════════ -->
+  <section class="craft-section">
+    <div class="section-wrapper">
+      <div class="reveal">
+        <div class="section-label">Planning</div>
+        <h2 class="section-title">Craft with confidence</h2>
+        <p class="section-subtitle">Replacing guesswork with clarity for more informed decisions across every stage of development.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card reveal reveal-delay-1">
+          <div class="feature-icon">🔄</div>
+          <h4>Planning alternatives</h4>
+          <p>Explore alternatives, and conduct "what if" design scenarios in minutes. Compare different structures, heights, angles and locations</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-2">
+          <div class="feature-icon">📁</div>
+          <h4>Your own data</h4>
+          <p>Easily import and upload your own data layers, integrated into the system in real-time, and share your data with stakeholders</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-3">
+          <div class="feature-icon">🏙️</div>
+          <h4>City Evolution</h4>
+          <p>Convenient split screen to view past, present and future status of urban areas with highly-accurate citywide/neighborhood views</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════
+       COLLABORATE SECTION
+  ══════════════════════════════════ -->
+  <section class="collaborate-section">
+    <div class="section-wrapper">
+      <div class="reveal">
+        <div class="section-label">Collaboration</div>
+        <h2 class="section-title">Collaborate with Ease</h2>
+        <p class="section-subtitle">Shared Understanding and Team Alignment Have Never Been This Effortless.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card reveal reveal-delay-1">
+          <div class="feature-icon">👥</div>
+          <h4>Collective Perspective</h4>
+          <p>Allowing for streamlined work, together. From layers of data, view points, and presentations</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-2">
+          <div class="feature-icon">⚡</div>
+          <h4>Accelerated Approvals</h4>
+          <p>Sharing a single 3D workspace with all urban planning project stakeholders, enhances communication to speed up approvals</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-3">
+          <div class="feature-icon">🎨</div>
+          <h4>Enhanced Showcasing</h4>
+          <p>Bookmarks, presentations, image uploads, links, files, and additional explanations for each element of data added</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════
+       PLATFORM DEMO SECTION
+  ══════════════════════════════════ -->
+  <section class="platform-demo-section" id="demo">
+    <div class="section-wrapper">
+      <div class="reveal">
+        <div class="section-label">Live Demo</div>
+        <h2 class="section-title">See the platform in action</h2>
+        <p class="section-subtitle">Interact with real 3D city data — measure, analyze, and explore from your browser.</p>
+      </div>
+
+      <div class="demo-container reveal">
+        <div class="demo-controls">
+          <div class="demo-controls-title">Control Panel</div>
+
+          <div class="control-item">
+            <label>
+              <input type="checkbox" id="siteAccessible">
+              Site Accessible
+            </label>
+          </div>
+          <div class="control-item">
+            <label>
+              <input type="checkbox" id="landUse">
+              Land Use
+            </label>
+            <span class="toggle-label">OFF</span>
+          </div>
+          <div class="control-item">
+            <label>Sun Position</label>
+            <input type="datetime-local" class="datetime-input">
+          </div>
+          <div class="control-item">
+            <button class="control-btn">Plan / Build</button>
+          </div>
+          <div class="control-item" style="display:flex; align-items:center; gap:8px;">
+            <button class="control-btn">Comment</button>
+            <div class="zoom-controls">
+              <button class="zoom-btn">−</button>
+              <button class="zoom-btn">+</button>
+            </div>
+          </div>
+          <div class="control-item" style="display:flex; align-items:center; gap:8px;">
+            <button class="control-btn">Share</button>
+            <div class="zoom-controls">
+              <button class="zoom-btn">−</button>
+              <button class="zoom-btn">+</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-viewer">
+          <a href="index.html" class="demo-link">
+            <div class="demo-placeholder">
+              <div class="demo-placeholder-icon">🌐</div>
+              <p>Launch SimplexDM</p>
+              <div class="demo-placeholder-hint">Click to open the full 3D platform</div>
+              <div class="demo-arrow">→</div>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════
+       USE CASES SECTION
+  ══════════════════════════════════ -->
+  <section class="use-cases-section">
+    <div class="section-wrapper">
+      <div class="reveal">
+        <div class="section-label">Use Cases</div>
+        <h2 class="section-title">Step into your new dimension</h2>
+        <p class="section-subtitle">Purpose-built for every stakeholder in the built environment.</p>
+      </div>
+
+      <div class="use-cases-grid">
+        <div class="use-case-card reveal">
+          <span class="use-case-icon">🏛️</span>
+          <h4>Architecture</h4>
+          <p>Blend prototypes into landscapes to bring your vision to life</p>
+          <a href="index.html" class="use-case-link">Learn More →</a>
+        </div>
+        <div class="use-case-card reveal reveal-delay-1">
+          <span class="use-case-icon">🏙️</span>
+          <h4>Urban planning</h4>
+          <p>Insightful urban context, interactive simulations, and efficient collaboration</p>
+          <a href="index.html" class="use-case-link">Learn More →</a>
+        </div>
+        <div class="use-case-card reveal reveal-delay-2">
+          <span class="use-case-icon">🏢</span>
+          <h4>Real Estate Development</h4>
+          <p>Smarten investments, spot opportunities</p>
+          <a href="index.html" class="use-case-link">Learn More →</a>
+        </div>
+        <div class="use-case-card reveal reveal-delay-3">
+          <span class="use-case-icon">💰</span>
+          <h4>Real estate appraisement</h4>
+          <p>Accurate evaluations in minutes</p>
+          <a href="index.html" class="use-case-link">Learn More →</a>
+        </div>
+        <div class="use-case-card reveal">
+          <span class="use-case-icon">🏛️</span>
+          <h4>Local government</h4>
+          <p>Drive community engagement and streamline administration</p>
+          <a href="index.html" class="use-case-link">Learn More →</a>
+        </div>
+        <div class="use-case-card reveal reveal-delay-1">
+          <span class="use-case-icon">🔧</span>
+          <h4>Infrastructure</h4>
+          <p>Robust planning and operations with life-like 3D views of the field</p>
+          <a href="index.html" class="use-case-link">Learn More →</a>
+        </div>
+        <div class="use-case-card reveal reveal-delay-2">
+          <span class="use-case-icon">🏠</span>
+          <h4>Brokers</h4>
+          <p>More transactions made with context</p>
+          <a href="index.html" class="use-case-link">Learn More →</a>
+        </div>
+        <div class="use-case-card reveal reveal-delay-3">
+          <span class="use-case-icon">🔒</span>
+          <h4>Security &amp; HLS</h4>
+          <p>Full control of your sites from every perspective</p>
+          <a href="index.html" class="use-case-link">Learn More →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════
+       CTA SECTION
+  ══════════════════════════════════ -->
+  <section class="cta-section">
+    <div class="cta-content reveal">
+      <div class="section-label" style="justify-content: center; margin-bottom: 20px;">Get Started</div>
+      <h2>Create your own<br>Reality Today</h2>
+      <p>Join the teams redefining how cities are planned, built, and understood — at 3cm per pixel precision.</p>
+      <a href="index.html" class="btn-hero" id="startCreatingBtn2">
+        Start Creating
+        <span class="btn-hero-arrow">→</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════
+       FOOTER
+  ══════════════════════════════════ -->
+  <footer class="landing-footer">
+    <div class="footer-content">
+      <a href="landing.html" class="footer-brand">
+        <div class="footer-logo-mark">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3L4 7.5V16.5L12 21L20 16.5V7.5L12 3Z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="footer-brand-name">Meridian</span>
+      </a>
+
+      <span class="footer-meta">© 2025 Meridian. All rights reserved.</span>
+
+      <div class="footer-links">
+        <a href="admin.html">Admin</a>
+        <a href="#demo">Demo</a>
+        <a href="index.html">Platform</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ══════════════════════════════════
+       SCRIPTS (preserving all original handlers)
+  ══════════════════════════════════ -->
+  <script>
+    // Original navigation handlers — preserved exactly
+    document.getElementById('startCreatingBtn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.location.href = 'index.html';
+    });
+
+    document.getElementById('startCreatingBtn2')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.location.href = 'index.html';
+    });
+
+    document.getElementById('bookDemoBtn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.querySelector('.platform-demo-section')?.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    document.getElementById('signInBtn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      alert('Sign In functionality — to be implemented');
+    });
+
+    // Intersection Observer for reveal animations
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+  </script>
+
+  <script src="js/siteContentClient.js"></script>
+</body>
+</html>

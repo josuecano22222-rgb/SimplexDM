@@ -1,0 +1,51 @@
+{
+  "modelsMap": {
+    "cities": []
+  },
+  "tools": {
+    "enabled": true,
+    "items": []
+  },
+  "features": {
+    "measurement": { "enabled": true },
+    "navigation": { "enabled": true }
+  },
+  "performance": {
+    "renderLoopFrameBudgetMs": 8,
+    "idleCallbackTimeoutMs": 2000,
+    "deferredInitYieldMs": 10
+  },
+  "layerRendering": {
+    "enabled": true,
+    "tilesetMaximumScreenSpaceError": 8,
+    "enableDynamicScreenSpaceError": false,
+    "polylineGranularityDeg": 0.1,
+    "fxaa": true,
+    "depthTestAgainstTerrain": true,
+    "vectorPointsAlwaysOnTop": false
+  },
+  "Project": {
+    "Optional_tools": {
+      "SceneTuning": {
+        "imageryContrast": 1,
+        "imageryBrightness": 1
+      },
+      "SceneModes": {
+        "transparency": { "alpha": 0.45 },
+        "fog": { "density": 0.0004, "minimumBrightness": 0.35 },
+        "distance": { "density": 0.0025 },
+        "height": { "heightDivisor": 200 },
+        "remapColors": { "heightDivisor": 25 },
+        "ortho": { "orthoWidthFactor": 0.35 },
+        "slope": {
+          "thresholdDeg1": 15,
+          "thresholdDeg2": 30,
+          "thresholdDeg3": 45,
+          "gridSamples": 20
+        },
+        "snow": { "density": 0.0018, "minimumBrightness": 0.65 },
+        "rain": { "density": 0.0012, "minimumBrightness": 0.45 }
+      }
+    }
+  }
+}

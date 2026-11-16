@@ -1,0 +1,279 @@
+/* Offline map labels panel (.label-manager-ui inside left sidebar) */
+.label-manager-ui {
+    font-size: calc(13px * var(--ui-fs-mul));
+    color: var(--color-text, #e0e0e0);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 4px 0 8px;
+}
+
+.lm-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: calc(12px * var(--ui-fs-mul));
+    line-height: 1.45;
+}
+
+.lm-banner--muted {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.lm-banner .fa-info-circle {
+    margin-top: 2px;
+    opacity: 0.7;
+}
+
+.lm-master-section {
+    padding-bottom: 2px;
+}
+
+.lm-master-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: calc(13px * var(--ui-fs-mul));
+}
+
+.lm-master-toggle input {
+    margin-top: 3px;
+}
+
+.lm-hint {
+    margin: 6px 0 0 24px;
+    font-size: calc(11px * var(--ui-fs-mul));
+    opacity: 0.55;
+    line-height: 1.4;
+}
+
+.lm-controls--disabled {
+    opacity: 0.45;
+    pointer-events: none;
+    filter: grayscale(0.25);
+}
+
+#labelManagerMount.lm-flash {
+    animation: lm-flash-pulse 1.2s ease-out 1;
+}
+
+@keyframes lm-flash-pulse {
+    0% {
+        box-shadow: inset 0 0 0 0 rgba(0, 185, 255, 0);
+    }
+    25% {
+        box-shadow: inset 0 0 0 2px rgba(0, 185, 255, 0.55);
+    }
+    100% {
+        box-shadow: inset 0 0 0 0 rgba(0, 185, 255, 0);
+    }
+}
+
+.lm-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.lm-section-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-weight: 500;
+    font-size: calc(12px * var(--ui-fs-mul));
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.75;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lm-section-header span:first-of-type {
+    flex: 1;
+    min-width: 0;
+}
+
+.lm-type-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.lm-type-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    cursor: pointer;
+    font-size: calc(11px * var(--ui-fs-mul));
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.lm-type-chip.active,
+.lm-type-chip:has(input:checked) {
+    background: rgba(100, 180, 255, 0.18);
+    border-color: rgba(100, 180, 255, 0.5);
+}
+
+.lm-type-chip input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.lm-select {
+    width: 100%;
+    padding: 5px 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    color: inherit;
+    font-size: calc(12px * var(--ui-fs-mul));
+}
+
+.lm-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    background: rgba(100, 180, 255, 0.15);
+    border: 1px solid rgba(100, 180, 255, 0.3);
+    border-radius: 6px;
+    color: inherit;
+    font-size: calc(11px * var(--ui-fs-mul));
+    cursor: pointer;
+    margin-left: auto;
+    transition: background 0.15s;
+}
+
+.lm-btn:hover {
+    background: rgba(100, 180, 255, 0.28);
+}
+
+.lm-btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.lm-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.lm-hint-tight {
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+
+.lm-url-input {
+    width: 100%;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+}
+
+.lm-download-actions {
+    margin-bottom: 12px;
+}
+
+.lm-download-actions:last-of-type {
+    margin-bottom: 0;
+}
+
+.lm-btn-small {
+    padding: 2px 6px;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+    color: inherit;
+    font-size: calc(10px * var(--ui-fs-mul));
+    cursor: pointer;
+}
+
+.lm-btn-icon {
+    background: none;
+    border: none;
+    color: rgba(255, 100, 100, 0.75);
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: calc(11px * var(--ui-fs-mul));
+    opacity: 0.65;
+    transition: opacity 0.15s;
+}
+
+.lm-btn-icon:hover {
+    opacity: 1;
+}
+
+.lm-progress {
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+    font-size: calc(11px * var(--ui-fs-mul));
+}
+
+.lm-progress-bar {
+    position: absolute;
+    inset: 0;
+    background: rgba(100, 180, 255, 0.2);
+    transition: width 0.3s;
+    z-index: 0;
+    pointer-events: none;
+}
+
+#lm-progress-msg {
+    position: relative;
+    z-index: 1;
+}
+
+.lm-region-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.lm-region-row {
+    display: flex;
+    align-items: center;
+    padding: 5px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    gap: 6px;
+}
+
+.lm-region-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.lm-region-name {
+    font-weight: 500;
+    font-size: calc(12px * var(--ui-fs-mul));
+}
+
+.lm-region-meta {
+    opacity: 0.55;
+    font-size: calc(10px * var(--ui-fs-mul));
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+.lm-empty {
+    opacity: 0.45;
+    font-size: calc(11px * var(--ui-fs-mul));
+    padding: 6px 0;
+}
