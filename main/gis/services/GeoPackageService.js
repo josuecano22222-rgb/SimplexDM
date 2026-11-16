@@ -4,9 +4,8 @@ const { GeoPackageAPI } = require('@ngageoint/geopackage');
 
 /**
  * GeoPackageService
- * Uses @ngageoint/geopackage to manage vector layers and features.
- *
- * Raster tiles support will be layered in via tile tables (later in raster todo).
+ * Uses @ngageoint/geopackage to manage vector layers and features in OGC GeoPackage containers.
+ * Raster datasets are managed by the companion RasterService (GeoTIFF / COG).
  */
 class GeoPackageService {
   /**

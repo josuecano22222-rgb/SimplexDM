@@ -107,56 +107,63 @@ class EnhancedMeasurementManager {
                 <div class="measurement-tool-header">
                     <div class="measurement-tool-header-text">
                         <h3 id="measurementToolTitle">Measurement Tools</h3>
-                        <p class="measurement-tool-subtitle">Pick a tool, then click directly in the 3D scene.</p>
+                        <p class="measurement-tool-subtitle">Pick a tool, then click directly in the 3D scene (right-click to finish, Esc to cancel).</p>
                     </div>
-                    <button class="close-btn" id="closeMeasurementToolbarBtn">×</button>
+                    <button type="button" class="close-btn" id="closeMeasurementToolbarBtn" aria-label="Close measurement toolbar">×</button>
                 </div>
-                <div class="measurement-tool-group-label">Distance & Geometry</div>
-                <div class="measurement-tools-grid">
-                    <div class="measurement-tool-item" data-type="distance-point" title="Point-to-Point Distance">
-                        <div class="tool-icon" aria-hidden="true">📏</div>
+                <div class="measurement-tool-group-label">Distance, Surface &amp; 3D Geometry</div>
+                <div class="measurement-tools-grid" role="list">
+                    <div class="measurement-tool-item" role="button" tabindex="0" data-type="distance-point" title="Point-to-Point Distance">
+                        <div class="tool-icon" aria-hidden="true"><i class="fas fa-ruler-horizontal"></i></div>
                         <div class="tool-content">
                             <div class="tool-label">Point Distance</div>
-                            <div class="tool-description">Two-point geodesic distance</div>
+                            <div class="tool-description">Two-point 3D &amp; geodesic distance</div>
                         </div>
                     </div>
-                    <div class="measurement-tool-item" data-type="polyline" title="Polyline/Path Measurement">
-                        <div class="tool-icon" aria-hidden="true">🛤️</div>
+                    <div class="measurement-tool-item" role="button" tabindex="0" data-type="ruler" title="3D Segmented Ruler">
+                        <div class="tool-icon" aria-hidden="true"><i class="fas fa-ruler-combined"></i></div>
+                        <div class="tool-content">
+                            <div class="tool-label">3D Ruler</div>
+                            <div class="tool-description">Distance + ΔZ + azimuth readout</div>
+                        </div>
+                    </div>
+                    <div class="measurement-tool-item" role="button" tabindex="0" data-type="polyline" title="Polyline/Path Measurement">
+                        <div class="tool-icon" aria-hidden="true"><i class="fas fa-route"></i></div>
                         <div class="tool-content">
                             <div class="tool-label">Polyline</div>
                             <div class="tool-description">Multi-segment path length</div>
                         </div>
                     </div>
-                    <div class="measurement-tool-item" data-type="height" title="Vertical Height Measurement">
-                        <div class="tool-icon" aria-hidden="true">📐</div>
+                    <div class="measurement-tool-item" role="button" tabindex="0" data-type="height" title="Vertical Height Measurement">
+                        <div class="tool-icon" aria-hidden="true"><i class="fas fa-arrows-alt-v"></i></div>
                         <div class="tool-content">
                             <div class="tool-label">Height</div>
                             <div class="tool-description">Vertical elevation delta</div>
                         </div>
                     </div>
-                    <div class="measurement-tool-item" data-type="distance-line" title="Simple Line Distance">
-                        <div class="tool-icon" aria-hidden="true">📏</div>
-                        <div class="tool-content">
-                            <div class="tool-label">Line Distance</div>
-                            <div class="tool-description">Straight segment distance</div>
-                        </div>
-                    </div>
-                    <div class="measurement-tool-item" data-type="vertical-segment" title="Vertical Segment">
-                        <div class="tool-icon" aria-hidden="true">⬆️</div>
-                        <div class="tool-content">
-                            <div class="tool-label">Vertical Segment</div>
-                            <div class="tool-description">Height segment by two picks</div>
-                        </div>
-                    </div>
-                    <div class="measurement-tool-item" data-type="area" title="Area Measurement (Polygon)">
-                        <div class="tool-icon" aria-hidden="true">▱</div>
+                    <div class="measurement-tool-item" role="button" tabindex="0" data-type="area" title="Area Measurement (Polygon)">
+                        <div class="tool-icon" aria-hidden="true"><i class="fas fa-draw-polygon"></i></div>
                         <div class="tool-content">
                             <div class="tool-label">Area</div>
-                            <div class="tool-description">Polygon area in m²/ha/km²</div>
+                            <div class="tool-description">Planar area in m²/ha/km²</div>
                         </div>
                     </div>
-                    <div class="measurement-tool-item" data-type="angle" title="Angle Measurement">
-                        <div class="tool-icon" aria-hidden="true">∠</div>
+                    <div class="measurement-tool-item" role="button" tabindex="0" data-type="roof-area" title="3D Inclined Plane / Surface Area">
+                        <div class="tool-icon" aria-hidden="true"><i class="fas fa-vector-square"></i></div>
+                        <div class="tool-content">
+                            <div class="tool-label">Plane / Surface</div>
+                            <div class="tool-description">True 3D sloped roof/facade area</div>
+                        </div>
+                    </div>
+                    <div class="measurement-tool-item" role="button" tabindex="0" data-type="volume" title="3D Prism Volume">
+                        <div class="tool-icon" aria-hidden="true"><i class="fas fa-cube"></i></div>
+                        <div class="tool-content">
+                            <div class="tool-label">Volume</div>
+                            <div class="tool-description">Footprint × elevation span (m³)</div>
+                        </div>
+                    </div>
+                    <div class="measurement-tool-item" role="button" tabindex="0" data-type="angle" title="Angle Measurement">
+                        <div class="tool-icon" aria-hidden="true"><i class="fas fa-drafting-compass"></i></div>
                         <div class="tool-content">
                             <div class="tool-label">Angle</div>
                             <div class="tool-description">Three-point angle in degrees</div>
@@ -164,10 +171,12 @@ class EnhancedMeasurementManager {
                     </div>
                 </div>
                 <div class="measurement-tool-actions">
-                    <button class="btn btn-danger" id="clearAllMeasurementsBtn">Clear All</button>
-                    <button class="btn" id="closeMeasurementToolbarBtn2">Close</button>
+                    <button type="button" class="btn btn-sm" id="exportMeasurementsGeoJsonBtn" title="Export measurements as 3D GeoJSON"><i class="fas fa-file-export" aria-hidden="true"></i> GeoJSON</button>
+                    <button type="button" class="btn btn-sm" id="exportMeasurementsCsvBtn" title="Export measurements as CSV with WGS84 &amp; UTM"><i class="fas fa-file-csv" aria-hidden="true"></i> CSV</button>
+                    <button type="button" class="btn btn-danger btn-sm" id="clearAllMeasurementsBtn">Clear All</button>
+                    <button type="button" class="btn btn-sm" id="closeMeasurementToolbarBtn2">Close</button>
                 </div>
-                <div id="measurementStatus" class="tool-status ready">Ready</div>
+                <div id="measurementStatus" class="tool-status ready" role="status" aria-live="polite">Ready</div>
                 <div class="measurement-result-panel">
                     <div class="result-item">
                         <div class="result-label">Latest Result:</div>
@@ -199,12 +208,27 @@ class EnhancedMeasurementManager {
             this.hideToolbar();
         });
 
-        // Tool selection
+        // Tool selection (click + Enter/Space keyboard activation)
         document.querySelectorAll('.measurement-tool-item').forEach(item => {
-            item.addEventListener('click', () => {
+            const activate = () => {
                 const type = item.dataset.type;
                 this.selectMeasurementType(type);
+            };
+            item.addEventListener('click', activate);
+            item.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    activate();
+                }
             });
+        });
+
+        // Export GeoJSON / CSV
+        document.getElementById('exportMeasurementsGeoJsonBtn')?.addEventListener('click', () => {
+            this.exportGeoJSON();
+        });
+        document.getElementById('exportMeasurementsCsvBtn')?.addEventListener('click', () => {
+            this.exportCSV();
         });
 
         // Clear all
@@ -1052,6 +1076,21 @@ class EnhancedMeasurementManager {
                 this.currentMeasurement.points[1]
             );
             this.currentMeasurement.result = this.formatDistance(result);
+        } else if (this.measurementType === 'ruler') {
+            let totalDistance = 0;
+            for (let i = 1; i < this.currentMeasurement.points.length; i++) {
+                totalDistance += this.calculateDistance(
+                    this.currentMeasurement.points[i - 1],
+                    this.currentMeasurement.points[i]
+                );
+            }
+            const first = this.currentMeasurement.points[0];
+            const last = this.currentMeasurement.points[this.currentMeasurement.points.length - 1];
+            const dz = this.calculateSignedHeight(first, last);
+            const bearing = this.calculateAzimuth(first, last);
+            result = totalDistance;
+            const dzSign = dz >= 0 ? '+' : '-';
+            this.currentMeasurement.result = `Ruler: ${this.formatDistance(totalDistance)} (ΔZ ${dzSign}${this.formatDistance(Math.abs(dz))}, ${bearing.toFixed(1)}°)`;
         } else if (this.measurementType === 'height' || this.measurementType === 'building-height') {
             result = this.calculateHeight(
                 this.currentMeasurement.points[0],
@@ -1066,9 +1105,19 @@ class EnhancedMeasurementManager {
                     this.currentMeasurement.points[i]
                 );
             }
+            result = totalDistance;
             this.currentMeasurement.result = `Total: ${this.formatDistance(totalDistance)}`;
-        } else if (this.measurementType === 'area' || this.measurementType === 'volume'
-            || this.measurementType === 'roof-area') {
+        } else if (this.measurementType === 'roof-area') {
+            result = this.calculate3DSurfaceArea(this.currentMeasurement.points);
+            this.currentMeasurement.result = `Plane Area: ${this.formatArea(result)}`;
+        } else if (this.measurementType === 'volume') {
+            const volInfo = this.calculateVolume(this.currentMeasurement.points);
+            result = volInfo.volume;
+            this.currentMeasurement.volume = volInfo.volume;
+            this.currentMeasurement.area = volInfo.area;
+            this.currentMeasurement.height = volInfo.height;
+            this.currentMeasurement.result = `Volume: ${this.formatVolume(volInfo.volume)} (${this.formatArea(volInfo.area)} × ${this.formatDistance(volInfo.height)})`;
+        } else if (this.measurementType === 'area') {
             result = this.calculateArea(this.currentMeasurement.points);
             this.currentMeasurement.result = `Area: ${this.formatArea(result)}`;
         } else if (this.measurementType === 'angle') {
@@ -1085,6 +1134,10 @@ class EnhancedMeasurementManager {
             );
             this.currentMeasurement.result = this.formatDistance(result);
         }
+
+        this.currentMeasurement.value = result;
+        this.currentMeasurement.formatted = this.currentMeasurement.result;
+        this.currentMeasurement.timestamp = new Date().toISOString();
 
         // Save measurement
         this.measurements.push(this.currentMeasurement);
@@ -1248,18 +1301,293 @@ class EnhancedMeasurementManager {
     }
 
     /**
+     * Calculate true 3D inclined surface / plane area (m²) via fan triangulation in ECEF.
+     */
+    calculate3DSurfaceArea(points) {
+        if (!Array.isArray(points) || points.length < 3) return 0;
+        const p0 = points[0];
+        let area = 0;
+        for (let i = 1; i < points.length - 1; i++) {
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const ux = p1.x - p0.x, uy = p1.y - p0.y, uz = p1.z - p0.z;
+            const vx = p2.x - p0.x, vy = p2.y - p0.y, vz = p2.z - p0.z;
+            const cx = uy * vz - uz * vy;
+            const cy = uz * vx - ux * vz;
+            const cz = ux * vy - uy * vx;
+            area += 0.5 * Math.hypot(cx, cy, cz);
+        }
+        return area;
+    }
+
+    /**
+     * Calculate signed vertical elevation difference (m) from p1 to p2.
+     */
+    calculateSignedHeight(p1, p2) {
+        const c1 = this._pointToWgs84(p1);
+        const c2 = this._pointToWgs84(p2);
+        if (!c1 || !c2) return 0;
+        return c2.elev - c1.elev;
+    }
+
+    /**
+     * Calculate forward azimuth bearing in degrees [0, 360) from p1 to p2.
+     */
+    calculateAzimuth(p1, p2) {
+        const c1 = this._pointToWgs84(p1);
+        const c2 = this._pointToWgs84(p2);
+        if (!c1 || !c2) return 0;
+        const toRad = Math.PI / 180;
+        const lat1 = c1.lat * toRad;
+        const lat2 = c2.lat * toRad;
+        const dLon = (c2.lon - c1.lon) * toRad;
+        const y = Math.sin(dLon) * Math.cos(lat2);
+        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+        return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+    }
+
+    /**
+     * Calculate 3D prism volume (m³) from polygon points and elevation span.
+     */
+    calculateVolume(points, explicitHeight = null) {
+        if (!Array.isArray(points) || points.length < 3) {
+            return { area: 0, height: 0, volume: 0 };
+        }
+        const area = typeof this.calculateArea === 'function'
+            ? this.calculateArea(points)
+            : this.calculate3DSurfaceArea(points);
+        let height = Number.isFinite(explicitHeight) && explicitHeight > 0 ? explicitHeight : 0;
+        if (!height) {
+            const elevs = points.map((p) => this._pointToWgs84(p)?.elev).filter((h) => Number.isFinite(h));
+            if (elevs.length >= 2) {
+                const span = Math.max(...elevs) - Math.min(...elevs);
+                height = span > 0.05 ? span : 3.0; // Default 3m single-storey prism if flat footprint
+            } else {
+                height = 3.0;
+            }
+        }
+        return { area, height, volume: area * height };
+    }
+
+    formatVolume(cubicMeters) {
+        const v = Number(cubicMeters) || 0;
+        if (this.currentUnit === 'feet' || this.currentUnit === 'imperial') {
+            return `${(v * 35.3146667).toFixed(2)} ft³`;
+        }
+        if (v >= 1e6) return `${(v / 1e6).toFixed(3)} hm³`;
+        return `${v.toFixed(2)} m³`;
+    }
+
+    /**
+     * Convert a Cartesian3 or `{ lon, lat, height/elev }` object into WGS84 `{ lon, lat, elev }`.
+     */
+    _pointToWgs84(pt) {
+        if (!pt) return null;
+        if (Number.isFinite(pt.lon) && Number.isFinite(pt.lat)) {
+            return { lon: pt.lon, lat: pt.lat, elev: Number(pt.elev ?? pt.height ?? 0) };
+        }
+        if (Number.isFinite(pt.longitude) && Number.isFinite(pt.latitude)) {
+            return { lon: pt.longitude, lat: pt.latitude, elev: Number(pt.height ?? pt.elev ?? 0) };
+        }
+        if (typeof Cesium !== 'undefined' && Cesium.Cartographic?.fromCartesian && Number.isFinite(pt.x)) {
+            const c = Cesium.Cartographic.fromCartesian(pt);
+            if (c) {
+                return {
+                    lon: Cesium.Math.toDegrees(c.longitude),
+                    lat: Cesium.Math.toDegrees(c.latitude),
+                    elev: Number.isFinite(c.height) ? c.height : 0,
+                };
+            }
+        }
+        // Pure WGS84 ECEF → geodetic fallback (works in headless tests without Cesium runtime)
+        if (Number.isFinite(pt.x) && Number.isFinite(pt.y) && Number.isFinite(pt.z)) {
+            const a = 6378137.0;
+            const e2 = 6.69437999014e-3;
+            const b = a * Math.sqrt(1 - e2);
+            const ep2 = (a * a - b * b) / (b * b);
+            const p = Math.hypot(pt.x, pt.y);
+            const th = Math.atan2(a * pt.z, b * p);
+            const lon = Math.atan2(pt.y, pt.x);
+            const lat = Math.atan2(
+                pt.z + ep2 * b * Math.pow(Math.sin(th), 3),
+                p - e2 * a * Math.pow(Math.cos(th), 3)
+            );
+            const sinLat = Math.sin(lat);
+            const N = a / Math.sqrt(1 - e2 * sinLat * sinLat);
+            const cosLat = Math.cos(lat);
+            const elev = Math.abs(cosLat) > 1e-10 ? p / cosLat - N : Math.abs(pt.z) - b;
+            return { lon: (lon * 180) / Math.PI, lat: (lat * 180) / Math.PI, elev };
+        }
+        return null;
+    }
+
+    _formatUtm(lon, lat) {
+        if (typeof window !== 'undefined' && window.coordinateManager?.wgs84ToUtm) {
+            const u = window.coordinateManager.wgs84ToUtm(lat, lon);
+            if (u) return `${u.zone}${u.band || u.hemisphere || ''} ${Math.round(u.easting)}E ${Math.round(u.northing)}N`;
+        }
+        if (!Number.isFinite(lon) || !Number.isFinite(lat) || lat < -80 || lat > 84) return '';
+        const zone = Math.min(60, Math.max(1, Math.floor((lon + 180) / 6) + 1));
+        const hemi = lat >= 0 ? 'N' : 'S';
+        const a = 6378137.0;
+        const f = 1 / 298.257223563;
+        const k0 = 0.9996;
+        const e2 = f * (2 - f);
+        const ep2 = e2 / (1 - e2);
+        const latRad = (lat * Math.PI) / 180;
+        const lon0 = (((zone - 1) * 6 - 180 + 3) * Math.PI) / 180;
+        const dLon = (lon * Math.PI) / 180 - lon0;
+        const sinLat = Math.sin(latRad);
+        const cosLat = Math.cos(latRad);
+        const tanLat = Math.tan(latRad);
+        const N = a / Math.sqrt(1 - e2 * sinLat * sinLat);
+        const T = tanLat * tanLat;
+        const C = ep2 * cosLat * cosLat;
+        const A = cosLat * dLon;
+        const M = a * (
+            (1 - e2 / 4 - (3 * e2 * e2) / 64) * latRad -
+            ((3 * e2) / 8 + (3 * e2 * e2) / 32) * Math.sin(2 * latRad) +
+            ((15 * e2 * e2) / 256) * Math.sin(4 * latRad)
+        );
+        const easting = k0 * N * (A + ((1 - T + C) * Math.pow(A, 3)) / 6) + 500000;
+        let northing = k0 * (M + N * tanLat * ((A * A) / 2 + ((5 - T + 9 * C + 4 * C * C) * Math.pow(A, 4)) / 24));
+        if (lat < 0) northing += 10000000;
+        return `${zone}${hemi} ${Math.round(easting)}E ${Math.round(northing)}N`;
+    }
+
+    /**
      * Return all recorded measurements (structured result summary).
      */
     getResults() {
-        return (this.measurements || []).map((m, idx) => ({
-            id: m.id || `measurement_${idx + 1}`,
-            type: m.type,
-            value: m.value ?? m.distance ?? m.area ?? m.height ?? m.angle ?? m.volume ?? null,
-            formatted: m.formatted || m.text || m.label || '',
-            unit: m.unit || this.currentUnit || 'meters',
-            pointCount: Array.isArray(m.points) ? m.points.length : 0,
-            timestamp: m.timestamp || null,
-        }));
+        return (this.measurements || []).map((m, idx) => {
+            const coords = (m.points || []).map((p) => this._pointToWgs84(p)).filter(Boolean);
+            const anchor = coords[0] || null;
+            return {
+                id: m.id || `measurement_${idx + 1}`,
+                type: m.type,
+                value: m.value ?? m.distance ?? m.area ?? m.height ?? m.angle ?? m.volume ?? null,
+                formatted: m.formatted || m.result || m.text || m.label || '',
+                unit: m.unit || this.currentUnit || 'meters',
+                pointCount: Array.isArray(m.points) ? m.points.length : 0,
+                anchor: anchor ? { ...anchor, utm: this._formatUtm(anchor.lon, anchor.lat) } : null,
+                timestamp: m.timestamp || null,
+            };
+        });
+    }
+
+    /**
+     * Serialize recorded measurements as an RFC 7946 3D GeoJSON FeatureCollection.
+     */
+    toGeoJSON() {
+        const polygonTypes = new Set(['area', 'roof-area', 'volume']);
+        const features = (this.measurements || []).map((m, idx) => {
+            const coords = (m.points || [])
+                .map((p) => this._pointToWgs84(p))
+                .filter(Boolean)
+                .map((c) => [Number(c.lon.toFixed(7)), Number(c.lat.toFixed(7)), Number(c.elev.toFixed(3))]);
+
+            let geometry = null;
+            if (coords.length === 1) {
+                geometry = { type: 'Point', coordinates: coords[0] };
+            } else if (coords.length >= 3 && polygonTypes.has(m.type)) {
+                const ring = [...coords];
+                const first = ring[0];
+                const last = ring[ring.length - 1];
+                if (first[0] !== last[0] || first[1] !== last[1] || first[2] !== last[2]) {
+                    ring.push([...first]);
+                }
+                geometry = { type: 'Polygon', coordinates: [ring] };
+            } else if (coords.length >= 2) {
+                geometry = { type: 'LineString', coordinates: coords };
+            }
+
+            const firstCoord = coords[0] || null;
+            return {
+                type: 'Feature',
+                id: m.id || `measurement_${idx + 1}`,
+                geometry,
+                properties: {
+                    id: m.id || `measurement_${idx + 1}`,
+                    type: m.type || 'distance-point',
+                    value: m.value ?? m.volume ?? m.area ?? m.distance ?? m.height ?? m.angle ?? null,
+                    formatted: m.formatted || m.result || m.text || '',
+                    unit: m.unit || this.currentUnit || 'meters',
+                    pointCount: coords.length,
+                    anchorLon: firstCoord ? firstCoord[0] : null,
+                    anchorLat: firstCoord ? firstCoord[1] : null,
+                    anchorElevationM: firstCoord ? firstCoord[2] : null,
+                    anchorUtm: firstCoord ? this._formatUtm(firstCoord[0], firstCoord[1]) : '',
+                    timestamp: m.timestamp || null,
+                },
+            };
+        });
+
+        return {
+            type: 'FeatureCollection',
+            name: 'meridian-measurements',
+            crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' } },
+            features,
+        };
+    }
+
+    /**
+     * Serialize recorded measurements as CSV with WGS84, elevation (m), and UTM columns.
+     */
+    toCSV() {
+        const esc = (v) => {
+            const s = v == null ? '' : String(v);
+            return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        };
+        const header = [
+            'id', 'type', 'value', 'unit', 'formatted',
+            'point_count', 'anchor_lat', 'anchor_lon', 'anchor_elevation_m', 'anchor_utm', 'timestamp',
+        ];
+        const rows = this.toGeoJSON().features.map((f) => {
+            const p = f.properties;
+            return [
+                p.id, p.type, p.value, p.unit, p.formatted,
+                p.pointCount, p.anchorLat, p.anchorLon, p.anchorElevationM, p.anchorUtm, p.timestamp,
+            ].map(esc).join(',');
+        });
+        return [header.join(','), ...rows].join('\n');
+    }
+
+    _downloadText(content, filename, mimeType) {
+        if (typeof document === 'undefined' || typeof Blob === 'undefined') return content;
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return content;
+    }
+
+    exportGeoJSON() {
+        if (!this.measurements || this.measurements.length === 0) {
+            window.notification?.warning?.('No measurements to export yet.');
+            return null;
+        }
+        const json = JSON.stringify(this.toGeoJSON(), null, 2);
+        const stamp = new Date().toISOString().slice(0, 10);
+        this._downloadText(json, `meridian-measurements-${stamp}.geojson`, 'application/geo+json');
+        window.notification?.success?.(`Exported ${this.measurements.length} measurement(s) to GeoJSON.`);
+        return json;
+    }
+
+    exportCSV() {
+        if (!this.measurements || this.measurements.length === 0) {
+            window.notification?.warning?.('No measurements to export yet.');
+            return null;
+        }
+        const csv = this.toCSV();
+        const stamp = new Date().toISOString().slice(0, 10);
+        this._downloadText(csv, `meridian-measurements-${stamp}.csv`, 'text/csv;charset=utf-8');
+        window.notification?.success?.(`Exported ${this.measurements.length} measurement(s) to CSV.`);
+        return csv;
     }
 
     /**
@@ -1274,6 +1602,10 @@ class EnhancedMeasurementManager {
 }
 
 // Initialize when available
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     window.enhancedMeasurementManager = new EnhancedMeasurementManager();
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { EnhancedMeasurementManager };
 }

@@ -21,6 +21,15 @@ class DashboardUI {
         return path;
     }
 
+    _esc(val) {
+        return String(val == null ? '' : val)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     /** Font Awesome icon + label (decorative icon: aria-hidden). */
     _dashBtn(label, iconClass, classNames = '', attrs = '') {
         const extra = attrs ? ' ' + attrs.trim() : '';
@@ -194,10 +203,12 @@ class DashboardUI {
             </div>
             <div class="quick-actions">
                 ${this._dashBtn(t('addPath'), 'fa-plus-circle', 'btn-primary', 'id="dashboardAddPathBtn"')}
+                ${this._dashBtn(t('loadSampleCampus') === 'dash.loadSampleCampus' ? (window.appI18n?.getLang?.() === 'ar' ? 'نموذج الحرم ثلاثي الأبعاد' : 'Sample 3D Campus') : t('loadSampleCampus'), 'fa-city', 'btn-primary', 'id="dashboardLoadSampleBtn"')}
                 ${this._dashBtn(t('uploadFile'), 'fa-cloud-upload-alt', '', 'id="dashboardUploadFileBtn"')}
+                ${this._dashBtn(t('openJsonEditor') === 'dash.openJsonEditor' ? (window.appI18n?.getLang?.() === 'ar' ? 'محرر JSON' : 'JSON Editor') : t('openJsonEditor'), 'fa-file-code', '', 'id="dashboardJsonEditorBtn"')}
                 ${this._dashBtn(t('importPaths'), 'fa-file-import', '', 'id="dashboardImportPathsBtn"')}
                 ${this._dashBtn(t('exportPaths'), 'fa-file-export', '', 'id="dashboardExportPathsBtn"')}
-                ${this._dashBtn(t('processLastTiles'), 'fa-microscope', 'btn-primary', `id="dashboardProcessLastTilesBtn" title="${String(t('processLastTilesTitle')).replace(/"/g, '&quot;')}"`)}
+                ${this._dashBtn(t('processLastTiles'), 'fa-microscope', 'btn-primary', `id="dashboardProcessLastTilesBtn" title="${this._esc(t('processLastTilesTitle'))}"`)}
             </div>
             <section class="dashboard-section recent-paths">
                 <h3 class="dashboard-section-title"><i class="fas fa-history" aria-hidden="true"></i><span>${t('recentPaths')}</span></h3>
@@ -208,14 +219,14 @@ class DashboardUI {
                             <div class="path-item">
                                 <div class="path-item-info">
                                     <div class="path-item-name">
-                                        ${path.name}
-                                        ${path.enabled !== false ? `<span class="path-status path-status--on" title="${t('enabled')}"><i class="fas fa-check-circle" aria-hidden="true"></i><span class="visually-hidden">${t('enabled')}</span></span>` : `<span class="path-status path-status--off" title="${t('disabled')}"><i class="far fa-circle" aria-hidden="true"></i><span class="visually-hidden">${t('disabled')}</span></span>`}
+                                        ${this._esc(path.name)}
+                                        ${path.enabled !== false ? `<span class="path-status path-status--on" title="${this._esc(t('enabled'))}"><i class="fas fa-check-circle" aria-hidden="true"></i><span class="visually-hidden">${this._esc(t('enabled'))}</span></span>` : `<span class="path-status path-status--off" title="${this._esc(t('disabled'))}"><i class="far fa-circle" aria-hidden="true"></i><span class="visually-hidden">${this._esc(t('disabled'))}</span></span>`}
                                     </div>
-                                    <div class="path-item-path"><i class="fas fa-link" aria-hidden="true"></i><span class="path-item-path-text">${path.path}</span></div>
-                                    <div class="path-meta"><i class="fas fa-tag" aria-hidden="true"></i><span>${t('pathMetaType')} ${path.type}</span></div>
+                                    <div class="path-item-path"><i class="fas fa-link" aria-hidden="true"></i><span class="path-item-path-text">${this._esc(path.path)}</span></div>
+                                    <div class="path-meta"><i class="fas fa-tag" aria-hidden="true"></i><span>${this._esc(t('pathMetaType'))} ${this._esc(path.type)}</span></div>
                                 </div>
                                 <div class="path-item-actions">
-                                    ${this._dashBtn(t('load'), 'fa-play-circle', '', `onclick="window.dashboardUI.loadPath('${path.id}')"`)}
+                                    ${this._dashBtn(t('load'), 'fa-play-circle', '', `data-load-path-id="${this._esc(path.id)}"`)}
                                 </div>
                             </div>
                         `).join('')
@@ -269,6 +280,28 @@ class DashboardUI {
         });
         document.getElementById('dashboardProcessLastTilesBtn')?.addEventListener('click', () => {
             this.processLastTilesWithHighAccuracy();
+        });
+        document.getElementById('dashboardLoadSampleBtn')?.addEventListener('click', async () => {
+            const sampleUrl = '/data/samples/meridian-campus/tileset.json';
+            if (window.app?.loadSampleTileset) {
+                await window.app.loadSampleTileset();
+            } else if (window.tilesetViewer?.loadTileset) {
+                await window.tilesetViewer.loadTileset(sampleUrl, { title: 'Meridian Campus (Sample)', flyTo: true });
+                window.app?.closeDashboard?.();
+            }
+        });
+        document.getElementById('dashboardJsonEditorBtn')?.addEventListener('click', () => {
+            if (window.fileEditor?.show) {
+                window.fileEditor.show();
+            } else {
+                document.getElementById('openJsonEditorBtn')?.click();
+            }
+        });
+        container.querySelectorAll('[data-load-path-id]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const pid = btn.getAttribute('data-load-path-id');
+                if (pid) this.loadPath(pid);
+            });
         });
     }
 

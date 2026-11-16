@@ -63,14 +63,16 @@
   },
   "homepage": "https://github.com/josuecano22222-rgb/SimplexDM#readme",
   "engines": {
-    "node": ">=16.0.0",
-    "npm": ">=7.0.0"
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.13",
     "@babel/preset-env": "^7.29.2",
     "@electron/rebuild": "^4.0.3",
     "@jest/globals": "^29.7.0",
     "@resvg/resvg-js": "^2.6.2",
+    "babel-loader": "^10.1.1",
     "copy-webpack-plugin": "^14.0.0",
     "cross-env": "^7.0.3",
     "electron": "^40.0.0",

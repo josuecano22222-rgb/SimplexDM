@@ -194,6 +194,39 @@ describe('Full-Repository Integration, Security & Build Integrity', () => {
         expect(calls.some((c) => c[0] === 'forward' && c[1] > 0)).toBe(true);
         expect(calls.some((c) => c[0] === 'lookRight')).toBe(true);
 
+        // Keyboard camera history undo/redo ([ / ] and Alt+ArrowLeft / Alt+ArrowRight)
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'BracketLeft', key: '[' }));
+        expect(camera.heading).toBe(0);
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'BracketRight', key: ']' }));
+        expect(camera.heading).toBe(1.2);
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', key: 'ArrowLeft', altKey: true }));
+        expect(camera.heading).toBe(0);
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight', key: 'ArrowRight', altKey: true }));
+        expect(camera.heading).toBe(1.2);
+
+        // Ctrl+K opens geographic search
+        let searchOpened = 0;
+        window.searchManager = { show: () => { searchOpened += 1; } };
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyK', key: 'k', ctrlKey: true }));
+        expect(searchOpened).toBe(1);
+        delete window.searchManager;
+
+        // Space and Escape cancel active Superman Flight Mode cleanly
+        let flightDisabledCount = 0;
+        window.supermanFlightModeManager = {
+            isEnabled: true,
+            disableFlightMode() {
+                this.isEnabled = false;
+                flightDisabledCount += 1;
+            },
+        };
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', key: ' ' }));
+        expect(flightDisabledCount).toBe(1);
+        window.supermanFlightModeManager.isEnabled = true;
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape' }));
+        expect(flightDisabledCount).toBe(2);
+        delete window.supermanFlightModeManager;
+
         const countBefore = calls.length;
         const input = document.createElement('input');
         document.body.appendChild(input);
@@ -209,5 +242,35 @@ describe('Full-Repository Integration, Security & Build Integrity', () => {
         expect(fc.features).toHaveLength(2);
         expect(fc.features[0].geometry.coordinates).toEqual([4.9, 52.37, 14]);
         expect(fc.features[0].properties.label).toBe('Tower, Main');
+    });
+
+    test('projectIntegrationIndex covers 100% of first-party public/js sources and CI/Babel configs exist', () => {
+        require('../../public/js/core/projectIntegrationIndex');
+        const entries = window.projectIntegrationIndex?.files || [];
+        const indexed = new Set(entries.map((e) => e.path));
+
+        const firstParty = [];
+        const walk = (dir) => {
+            for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, ent.name);
+                if (ent.isDirectory()) {
+                    if (ent.name === 'vendor') continue;
+                    walk(full);
+                } else if (ent.name.endsWith('.js')) {
+                    firstParty.push(path.relative(path.join(ROOT, 'public'), full).replace(/\\/g, '/'));
+                }
+            }
+        };
+        walk(path.join(ROOT, 'public', 'js'));
+
+        const missing = firstParty.filter((p) => !indexed.has(p));
+        expect(missing).toEqual([]);
+
+        expect(fs.existsSync(path.join(ROOT, 'babel.config.cjs'))).toBe(true);
+        expect(fs.existsSync(path.join(ROOT, '.github/workflows/ci.yml'))).toBe(true);
+        expect(fs.existsSync(path.join(ROOT, 'electron-builder.json'))).toBe(true);
+        const eb = JSON.parse(fs.readFileSync(path.join(ROOT, 'electron-builder.json'), 'utf8'));
+        expect(eb.appId).toBe('com.meridian.viewer');
+        expect(eb.asarUnpack).toContain('node_modules/jsts/dist/**/*');
     });
 });

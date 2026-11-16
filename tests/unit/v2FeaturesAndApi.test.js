@@ -352,6 +352,84 @@ describe('SimplexDM v2.0.0 — Geodesic Math, Solar Ephemeris, Security & Editor
         expect(ed.formatJSON('{"a":1}')).toBe('{\n  "a": 1\n}');
     });
 
+    test('EnhancedMeasurementManager computes 3D plane area, volume, azimuth, GeoJSON & CSV exports', () => {
+        const { EnhancedMeasurementManager } = require('../../public/js/features/enhancedMeasurementManager');
+        const mgr = Object.create(EnhancedMeasurementManager.prototype);
+        mgr.currentUnit = 'meters';
+        mgr.measurements = [];
+
+        // Inclined 3m x 5m rectangle in 3D space (slope 3-4-5): exact surface area = 15 m²
+        const slopedRect = [
+            { x: 0, y: 0, z: 0 },
+            { x: 3, y: 0, z: 0 },
+            { x: 3, y: 4, z: 3 },
+            { x: 0, y: 4, z: 3 },
+        ];
+        expect(mgr.calculate3DSurfaceArea(slopedRect)).toBeCloseTo(15, 8);
+
+        // Due-east azimuth from (4.90°E, 52.37°N) -> ~90°
+        const az = mgr.calculateAzimuth({ lon: 4.9, lat: 52.37, elev: 0 }, { lon: 4.91, lat: 52.37, elev: 0 });
+        expect(az).toBeGreaterThan(89.5);
+        expect(az).toBeLessThan(90.5);
+
+        // 3D prism volume using a 10m x 10m floor area with 12m elevation span = 1200 m³
+        mgr.calculateArea = () => 100;
+        const vol = mgr.calculateVolume([
+            { lon: 4.9041, lat: 52.3676, elev: 2 },
+            { lon: 4.9043, lat: 52.3676, elev: 2 },
+            { lon: 4.9043, lat: 52.3678, elev: 14 },
+            { lon: 4.9041, lat: 52.3678, elev: 14 },
+        ]);
+        expect(vol.area).toBe(100);
+        expect(vol.height).toBeCloseTo(12, 8);
+        expect(vol.volume).toBeCloseTo(1200, 8);
+
+        // Export line + polygon measurements to RFC 7946 3D GeoJSON & CSV (with UTM)
+        mgr.measurements = [
+            {
+                id: 'm_line',
+                type: 'ruler',
+                value: 142.5,
+                formatted: 'Ruler: 142.50 m (ΔZ +8.00 m, 90.0°)',
+                points: [
+                    { lon: 4.9041, lat: 52.3676, elev: 2.5 },
+                    { lon: 4.9062, lat: 52.3676, elev: 10.5 },
+                ],
+                timestamp: '2026-11-16T12:00:00.000Z',
+            },
+            {
+                id: 'm_roof',
+                type: 'roof-area',
+                value: 256.4,
+                formatted: 'Plane Area: 256.40 m²',
+                points: [
+                    { lon: 4.9041, lat: 52.3676, elev: 12 },
+                    { lon: 4.9044, lat: 52.3676, elev: 12 },
+                    { lon: 4.9044, lat: 52.3678, elev: 16 },
+                    { lon: 4.9041, lat: 52.3678, elev: 16 },
+                ],
+                timestamp: '2026-11-16T12:01:00.000Z',
+            },
+        ];
+
+        const gj = mgr.toGeoJSON();
+        expect(gj.type).toBe('FeatureCollection');
+        expect(gj.features).toHaveLength(2);
+        expect(gj.features[0].geometry.type).toBe('LineString');
+        expect(gj.features[0].geometry.coordinates[0]).toEqual([4.9041, 52.3676, 2.5]);
+        expect(gj.features[0].properties.anchorUtm).toMatch(/^31[NU] \d+E \d+N$/);
+        expect(gj.features[1].geometry.type).toBe('Polygon');
+        // Closed linear ring (5 vertices for 4-corner polygon)
+        expect(gj.features[1].geometry.coordinates[0]).toHaveLength(5);
+
+        const csv = mgr.toCSV();
+        const lines = csv.split('\n');
+        expect(lines).toHaveLength(3);
+        expect(lines[0]).toContain('anchor_utm');
+        expect(lines[1]).toContain('"Ruler: 142.50 m (ΔZ +8.00 m, 90.0°)"');
+        expect(lines[2]).toContain('m_roof,roof-area,256.4');
+    });
+
     test('Static security & completeness: zero raw alert(), zero external font CDNs, full OSS docs', () => {
         for (const doc of ['README.md', 'LICENSE', 'CONTRIBUTING.md']) {
             const p = path.join(ROOT, doc);

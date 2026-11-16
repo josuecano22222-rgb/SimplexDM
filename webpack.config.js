@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
@@ -94,7 +95,24 @@ module.exports = {
         extensions: ['.js'],
     },
     module: {
-        rules: [],
+        rules: [
+            {
+                test: /\.js$/,
+                include: [path.join(__dirname, 'public', 'js')],
+                exclude: [
+                    /node_modules/,
+                    path.join(__dirname, 'public', 'js', 'vendor'),
+                    /appI18n\.locale-(?:en|ar)\.js$/,
+                ],
+                use: {
+                    loader: 'babel-loader',
+                    options: {
+                        cacheDirectory: true,
+                        compact: isProd,
+                    },
+                },
+            },
+        ],
     },
     plugins: [
         new HtmlWebpackPlugin({
@@ -116,6 +134,20 @@ module.exports = {
                 : false,
         }),
         new RemoveScriptTagsPlugin(),
+        {
+            apply(compiler) {
+                compiler.hooks.done.tap('CleanupGeneratedEntryPlugin', () => {
+                    const generatedEntry = path.join(__dirname, 'webpack-entry.js');
+                    if (!process.env.KEEP_WEBPACK_ENTRY && fs.existsSync(generatedEntry)) {
+                        try {
+                            fs.unlinkSync(generatedEntry);
+                        } catch (_) {
+                            // Ignore transient lock errors on Windows
+                        }
+                    }
+                });
+            },
+        },
         new CopyWebpackPlugin({
             patterns: [
                 {

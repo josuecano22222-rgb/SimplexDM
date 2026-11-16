@@ -59,6 +59,29 @@ function runRebuild(options = {}) {
         process.exit(result.status || 1);
     }
     console.warn(msg);
+
+    // Ensure host Node.js binary is loadable (compile against local Node headers if offline)
+    try {
+        const Database = require('better-sqlite3');
+        const probe = new Database(':memory:');
+        probe.close();
+    } catch (_) {
+        const localNodePrefix = path.resolve(process.execPath, '..', '..');
+        const localNodeHeader = path.join(localNodePrefix, 'include', 'node', 'node.h');
+        const rebuildEnv = { ...env };
+        if (!rebuildEnv.npm_config_nodedir && fs.existsSync(localNodeHeader)) {
+            rebuildEnv.npm_config_nodedir = localNodePrefix;
+        }
+        const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+        console.log('[rebuild] Compiling better-sqlite3 for host Node.js ABI...');
+        spawnSync(npmBin, ['rebuild', 'better-sqlite3', '@ngageoint/geopackage'], {
+            cwd: ROOT_DIR,
+            stdio: 'inherit',
+            shell: process.platform === 'win32',
+            env: rebuildEnv,
+        });
+    }
+
     return { status: 'fallback', exitCode: result.status };
 }
 

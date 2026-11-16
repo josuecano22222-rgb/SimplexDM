@@ -48,8 +48,12 @@ class NavigationManager {
         if (!this.tilesetViewer || !this.tilesetViewer.viewer) return;
 
         const camera = this.tilesetViewer.viewer.camera;
+        const clonedPos =
+            typeof Cesium !== 'undefined' && Cesium.Cartesian3?.clone
+                ? Cesium.Cartesian3.clone(camera.position)
+                : { x: camera.position?.x || 0, y: camera.position?.y || 0, z: camera.position?.z || 0 };
         const position = {
-            position: Cesium.Cartesian3.clone(camera.position),
+            position: clonedPos,
             heading: camera.heading,
             pitch: camera.pitch,
             roll: camera.roll,
@@ -92,6 +96,22 @@ class NavigationManager {
             return true;
         }
         return false;
+    }
+
+    canUndo() {
+        return this.historyIndex > 0;
+    }
+
+    canRedo() {
+        return this.historyIndex >= 0 && this.historyIndex < this.history.length - 1;
+    }
+
+    undo() {
+        return this.navigateBack();
+    }
+
+    redo() {
+        return this.navigateForward();
     }
 
     /**
@@ -382,40 +402,43 @@ class NavigationManager {
 
         this._keydownHandler = (e) => {
             if (e.defaultPrevented) return;
-            if (e.ctrlKey || e.metaKey || e.altKey) return;
-            if (NavigationManager.isEditableTarget(e.target) || NavigationManager.isEditableTarget(document.activeElement)) {
-                return;
-            }
 
-            // Universal Ctrl/Cmd+K focuses geographic search
-            if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') {
+            // Universal Ctrl/Cmd+K opens/focuses geographic search (even from toolbar inputs)
+            if ((e.ctrlKey || e.metaKey) && !e.altKey && e.code === 'KeyK') {
                 e.preventDefault();
                 window.searchManager?.show?.();
                 return;
             }
 
-            // `?` toggles Navigation Help overlay
-            if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                e.preventDefault();
-                window.navigationHelpUI?.toggle?.();
+            if (NavigationManager.isEditableTarget(e.target) || NavigationManager.isEditableTarget(document.activeElement)) {
                 return;
             }
 
             // Camera history undo/redo: Alt+ArrowLeft / Alt+ArrowRight or [ / ]
             if (
-                (e.altKey && e.code === 'ArrowLeft') ||
+                (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'ArrowLeft') ||
                 (!e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'BracketLeft')
             ) {
                 e.preventDefault();
-                window.cameraHistory?.undo?.();
+                this.navigateBack();
                 return;
             }
             if (
-                (e.altKey && e.code === 'ArrowRight') ||
+                (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'ArrowRight') ||
                 (!e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'BracketRight')
             ) {
                 e.preventDefault();
-                window.cameraHistory?.redo?.();
+                this.navigateForward();
+                return;
+            }
+
+            // Ignore remaining browser/OS modifier chords (Ctrl/Cmd/Alt)
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+            // `?` toggles Navigation Help overlay
+            if (e.key === '?') {
+                e.preventDefault();
+                window.navigationHelpUI?.toggle?.();
                 return;
             }
 
@@ -425,8 +448,8 @@ class NavigationManager {
                     window.streetViewManager.exitStreetView();
                     return;
                 }
-                if (window.supermanFlightModeManager?.isActive) {
-                    window.supermanFlightModeManager.stop?.();
+                if (window.supermanFlightModeManager?.isEnabled || window.supermanFlightModeManager?.isActive) {
+                    window.supermanFlightModeManager.disableFlightMode?.();
                     return;
                 }
                 if (window.flightModeManager?.isActive || window.flightModeManager?.isFlying) {
@@ -448,14 +471,15 @@ class NavigationManager {
 
             // Defer WASD/QE while Street View or Flight / Superman Flight Mode owns keyboard movement
             const activeFlight =
+                window.supermanFlightModeManager?.isEnabled ||
                 window.supermanFlightModeManager?.isActive ||
                 window.flightModeManager?.isFlying ||
                 window.flightModeManager?.isActive;
             if (window.streetViewManager?.isActive || activeFlight) {
                 if (e.code === 'Space' && activeFlight) {
                     e.preventDefault();
-                    if (window.supermanFlightModeManager?.isActive) {
-                        window.supermanFlightModeManager.stop?.();
+                    if (window.supermanFlightModeManager?.isEnabled || window.supermanFlightModeManager?.isActive) {
+                        window.supermanFlightModeManager.disableFlightMode?.();
                     } else if (typeof window.flightModeManager?.stopFlight === 'function') {
                         window.flightModeManager.stopFlight();
                     } else if (typeof window.flightModeManager?.hide === 'function') {
@@ -660,12 +684,19 @@ class NavigationManager {
     }
 }
 
-// Export singleton instance
-window.navigationManager = new NavigationManager();
+// Export singleton instance (browser) and class (CJS tests)
+if (typeof window !== 'undefined') {
+    window.navigationManager = new NavigationManager();
+    window.cameraHistory = window.navigationManager;
 
-window.addEventListener('jsonConfigUpdated', () => {
-    const nm = window.navigationManager;
-    if (nm && typeof nm.applyNavigationFeatureConfig === 'function') {
-        nm.applyNavigationFeatureConfig();
-    }
-});
+    window.addEventListener('jsonConfigUpdated', () => {
+        const nm = window.navigationManager;
+        if (nm && typeof nm.applyNavigationFeatureConfig === 'function') {
+            nm.applyNavigationFeatureConfig();
+        }
+    });
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { NavigationManager };
+}

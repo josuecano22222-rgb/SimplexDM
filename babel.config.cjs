@@ -1,4 +1,36 @@
-/** Jest uses babel-jest; preset-env keeps public/js classes/syntax stable across Node versions. */
+/**
+ * Shared Babel configuration for SimplexDM v2.0.0:
+ * - Webpack 5 production/dev renderer bundles target Electron 40 & modern evergreen browsers.
+ * - Jest unit/integration tests target the active Node.js runtime via babel-jest.
+ */
 module.exports = {
-    presets: [['@babel/preset-env', { targets: { node: 'current' } }]]
+    sourceType: 'unambiguous',
+    presets: [
+        [
+            '@babel/preset-env',
+            {
+                targets: {
+                    electron: '40',
+                    chrome: '120',
+                    firefox: '121',
+                    safari: '17',
+                    edge: '120',
+                },
+                modules: false,
+                bugfixes: true,
+            },
+        ],
+    ],
+    env: {
+        test: {
+            presets: [
+                [
+                    '@babel/preset-env',
+                    {
+                        targets: { node: 'current' },
+                    },
+                ],
+            ],
+        },
+    },
 };
