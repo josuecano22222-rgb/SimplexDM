@@ -44,6 +44,77 @@ class FileManager {
     }
 
     /**
+     * Unified cross-platform file selection dialog (Electron IPC, File System Access API, or `<input type="file">`).
+     * Automatically loads selected 3D tileset JSON, 3D models, spatial layers, or `.rlp` label packs when requested.
+     */
+    async openFileDialog(options = {}) {
+        // 1. Electron native dialog (returns full OS filesystem paths)
+        if (window.electronAPI && typeof window.electronAPI.openFileDialog === 'function') {
+            const filters = options.filters || [
+                { name: '3D Tiles & Geospatial', extensions: ['json', 'glb', 'gltf', 'geojson', 'kml', 'kmz', 'csv', 'rlp'] },
+                { name: 'All Files', extensions: ['*'] },
+            ];
+            const res = await window.electronAPI.openFileDialog({
+                title: options.title || 'Open Tileset, Model, or Geospatial File',
+                filters,
+                properties: options.multiple ? ['openFile', 'multiSelections'] : ['openFile'],
+            });
+            if (res?.canceled || !res?.filePaths?.length) return null;
+            const chosen = res.filePaths[0];
+            if (options.autoLoad !== false) {
+                await this._autoOpenSelectedPath(chosen);
+            }
+            return options.multiple ? res.filePaths : chosen;
+        }
+
+        // 2. File System Access API
+        if (this.isAvailable()) {
+            const handle = await this.selectFile(options);
+            return handle;
+        }
+
+        // 3. Standard HTML `<input type="file">` fallback
+        return await new Promise((resolve) => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = options.accept || '.json,.glb,.gltf,.geojson,.kml,.kmz,.csv,.rlp';
+            input.multiple = Boolean(options.multiple);
+            input.style.display = 'none';
+            document.body.appendChild(input);
+            input.addEventListener('change', async () => {
+                const file = input.files?.[0] || null;
+                input.remove();
+                if (!file) {
+                    resolve(null);
+                    return;
+                }
+                const fsPath = window.electronAPI?.getPathForFile?.(file) || file.path || '';
+                if (fsPath && options.autoLoad !== false) {
+                    await this._autoOpenSelectedPath(fsPath);
+                    resolve(fsPath);
+                    return;
+                }
+                resolve(file);
+            });
+            input.addEventListener('cancel', () => {
+                input.remove();
+                resolve(null);
+            });
+            input.click();
+        });
+    }
+
+    async _autoOpenSelectedPath(filePath) {
+        const lower = String(filePath || '').toLowerCase();
+        if (lower.endsWith('.rlp') && window.electronAPI?.gis?.labels?.importRegion) {
+            await window.electronAPI.gis.labels.importRegion(filePath);
+            window.notification?.success?.('Label region pack imported');
+        } else if (lower.endsWith('.json') && window.tilesetViewer?.loadTileset) {
+            await window.tilesetViewer.loadTileset(filePath);
+        }
+    }
+
+    /**
      * Request file selection from user
      */
     async selectFile(options = {}) {
@@ -111,8 +182,12 @@ class FileManager {
      */
     async readFileViaHttp(path) {
         try {
-            const url = await this.pathResolver.resolvePath(path);
-            const response = await fetch(url);
+            const resolved = await this.pathResolver.resolvePath(path);
+            if (resolved && typeof resolved === 'object' && resolved.type === 'fileHandle' && resolved.handle) {
+                const file = await resolved.handle.getFile();
+                return await file.text();
+            }
+            const response = await fetch(resolved);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -126,22 +201,80 @@ class FileManager {
     }
 
     /**
-     * Write file content
+     * Write file content via FileSystemFileHandle, managed config endpoint, or browser download fallback.
      */
-    async writeFile(fileHandle, content) {
-        if (!fileHandle) {
-            throw new Error('File handle is required');
+    async writeFile(fileHandleOrPath, content) {
+        if (!fileHandleOrPath) {
+            throw new Error('File handle or path is required');
         }
-        
-        try {
-            const writable = await fileHandle.createWritable();
-            await writable.write(content);
-            await writable.close();
-            return true;
-        } catch (error) {
-            console.error('Error writing file:', error);
-            throw error;
+
+        // FileSystemFileHandle
+        if (typeof fileHandleOrPath === 'object' && typeof fileHandleOrPath.createWritable === 'function') {
+            try {
+                const writable = await fileHandleOrPath.createWritable();
+                await writable.write(content);
+                await writable.close();
+                return true;
+            } catch (error) {
+                console.error('Error writing file handle:', error);
+                throw error;
+            }
         }
+
+        if (typeof fileHandleOrPath === 'string') {
+            // Check registered handle first
+            const handle = this.fileHandleRegistry?.getHandle?.(fileHandleOrPath);
+            if (handle && typeof handle.createWritable === 'function') {
+                const writable = await handle.createWritable();
+                await writable.write(content);
+                await writable.close();
+                return true;
+            }
+
+            // Managed server JSON endpoints (`app-config.json` and `site-content.json`)
+            const norm = fileHandleOrPath.replace(/\\/g, '/').toLowerCase();
+            const base = this.pathResolver?.baseUrl || window.location?.origin || '';
+            if (norm.endsWith('config/app-config.json')) {
+                const resp = await fetch(`${base}/api/app-config`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: typeof content === 'string' ? content : JSON.stringify(content, null, 2),
+                });
+                if (!resp.ok) throw new Error(`Failed to save app-config.json (HTTP ${resp.status})`);
+                return true;
+            }
+            if (norm.endsWith('site/site-content.json')) {
+                const resp = await fetch(`${base}/api/site-content`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: typeof content === 'string' ? content : JSON.stringify(content, null, 2),
+                });
+                if (!resp.ok) throw new Error(`Failed to save site-content.json (HTTP ${resp.status})`);
+                return true;
+            }
+
+            // Fallback: trigger download of edited content
+            return this.downloadContent(this.pathResolver?.getFilename?.(fileHandleOrPath) || 'edited-file.json', content);
+        }
+
+        throw new Error('Unsupported file target for writeFile');
+    }
+
+    downloadContent(filename, content, mimeType = 'application/json;charset=utf-8') {
+        if (typeof document === 'undefined' || typeof Blob === 'undefined' || typeof URL === 'undefined') {
+            return false;
+        }
+        const text = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+        const blob = new Blob([text], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return true;
     }
 
     /**

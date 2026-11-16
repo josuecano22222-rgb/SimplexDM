@@ -22,7 +22,7 @@ function registerGisIpc({ ipcMain, app, dialog }) {
   const importExportService = new ImportExportService({ gpkgService, crsService });
   const geoprocessingService = new GeoprocessingService({ gpkgService, crsService });
   const offlineService = new OfflineService({ app });
-  const rasterService = new RasterService();
+  const rasterService = new RasterService({ crsService });
 
   // -------------------------
   // Project dialogs + lifecycle

@@ -39,6 +39,8 @@
          */
         cull(viewer, labels) {
             const scene = viewer.scene;
+            const canvasW = Number(scene?.canvas?.clientWidth || scene?.canvas?.width || 0);
+            const canvasH = Number(scene?.canvas?.clientHeight || scene?.canvas?.height || 0);
             const occupied = [];
             const visible = [];
             const p = this.padding;
@@ -47,7 +49,12 @@
                 const lbl = labels[i];
                 const cart3 = Cesium.Cartesian3.fromDegrees(lbl.lon, lbl.lat);
                 const cart2 = worldToWindowCoordinates(scene, cart3);
-                if (!cart2) continue;
+                if (!cart2 || !Number.isFinite(cart2.x) || !Number.isFinite(cart2.y)) continue;
+                if (canvasW > 0 && canvasH > 0) {
+                    if (cart2.x < 0 || cart2.x > canvasW || cart2.y < 0 || cart2.y > canvasH) {
+                        continue;
+                    }
+                }
 
                 const tw = this._estimateWidth(lbl.name, lbl.type);
                 const th = 16;

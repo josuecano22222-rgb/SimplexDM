@@ -545,6 +545,7 @@ class SupermanFlightModeManager {
         }
 
         this.isEnabled = true;
+        this.isActive = true;
         this._lastMovementTime =
             typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
         this._resetKeyState();
@@ -616,6 +617,7 @@ class SupermanFlightModeManager {
         if (!this.isEnabled) return;
 
         this.isEnabled = false;
+        this.isActive = false;
         this._unbindPreUpdateIfAny();
         this._unbindLifecycleListeners();
 
@@ -708,8 +710,16 @@ class SupermanFlightModeManager {
         }
     }
 
+    stop() {
+        if (this.isEnabled) {
+            this.disableFlightMode();
+        }
+    }
+
     toggle() {
-        if (this.modal && this.modal.style.display === 'none') {
+        if (this.isEnabled) {
+            this.disableFlightMode();
+        } else if (this.modal && this.modal.style.display === 'none') {
             this.show();
         } else {
             this.hide();

@@ -29,6 +29,13 @@ window.__SIMPLEX_LOCALE_AR = {
         "radius": "نصف القطر"
       }
     },
+    "tools": {
+      "search": "بحث",
+      "bookmarks": "الإشارات المرجعية",
+      "upload": "رفع",
+      "collaborate": "تعاون",
+      "performance": "الأداء"
+    },
     "toolbar": {
       "transparency": "الشفافية",
       "fog": "الضباب",
@@ -85,9 +92,19 @@ window.__SIMPLEX_LOCALE_AR = {
     }
   },
   "ui": {
+    "a11y": {
+      "skipToViewport": "التخطي إلى العرض ثلاثي الأبعاد"
+    },
     "brand": {
       "name": "Meridian",
       "sub": "منصة تخطيط الواقع"
+    },
+    "tools": {
+      "search": "بحث",
+      "bookmarks": "الإشارات المرجعية",
+      "upload": "رفع",
+      "collaborate": "تعاون",
+      "performance": "الأداء"
     },
     "nav": {
       "home": "الرئيسية",
@@ -151,7 +168,16 @@ window.__SIMPLEX_LOCALE_AR = {
         "school": "مدرسة",
         "poi": "نقطة اهتمام",
         "custom": "مخصص"
-      }
+      },
+      "downloadData": "قاعدة بيانات التسميات",
+      "downloadHint": "نزّل بيانات التسميات عبر HTTPS إلى تخزين التطبيق أو استورد حزمة .rlp محلية.",
+      "downloadWorld": "تنزيل قاعدة العالم",
+      "downloadWorldDone": "تم تثبيت قاعدة بيانات التسميات العالمية.",
+      "downloadRegionUrl": "تنزيل حزمة منطقة",
+      "downloadRegionDone": "تم تثبيت حزمة تسميات المنطقة.",
+      "worldUrlPlaceholder": "https://…/labels-world-base.db",
+      "regionUrlPlaceholder": "https://…/region.rlp",
+      "regionUrlRequired": "يرجى إدخال رابط HTTPS لحزمة المنطقة .rlp."
     },
     "restore": {
       "leftTitle": "تبديل الطبقات والمناطق",
@@ -202,7 +228,9 @@ window.__SIMPLEX_LOCALE_AR = {
       "coordLon": "خط الطول",
       "coordLat": "خط العرض",
       "coordHeight": "الارتفاع",
-      "coordUnitM": " م"
+      "coordUnitM": " م",
+      "displayModesAdvancedAria": "فتح أوضاع العرض المتقدمة",
+      "displayModesAdvancedTitle": "أوضاع العرض المتقدمة"
     },
     "rightSidebar": {
       "aria": "عناصر تحكم العارض",
@@ -285,7 +313,98 @@ window.__SIMPLEX_LOCALE_AR = {
       "resetStyle": " إعادة",
       "inspectorExportGroup": "تصدير",
       "exportFeatures": " عناصر",
-      "exportProperties": " خصائص"
+      "exportProperties": " خصائص",
+      "applyStyleShort": "تطبيق النمط",
+      "applyStyleTitle": "تطبيق نمط مجموعة البلاطات",
+      "clearAllTitle": "مسح الأدوات والقياسات النشطة",
+      "commentTitle": "التعليقات والتعاون",
+      "exportFeaturesShort": "تصدير المعالم",
+      "exportFeaturesTitle": "تصدير المعالم المفحوصة بصيغة JSON",
+      "exportPropertiesShort": "تصدير الخصائص",
+      "exportPropertiesTitle": "تصدير خصائص البلاطة بصيغة JSON",
+      "inspectorAnalyzeShort": "تحليل",
+      "inspectorAnalyzeTitle": "تحليل معالم وبيانات البلاطة",
+      "inspectorResetShort": "إعادة ضبط العرض",
+      "inspectorResetTitle": "إعادة ضبط الكاميرا إلى مجموعة البلاطات النشطة",
+      "inspectorToggleShort": "تبديل الإظهار",
+      "inspectorToggleTitle": "إظهار أو إخفاء مجموعة البلاطات النشطة",
+      "moveDownVertTitle": "تحريك مجموعة البلاطات للأسفل رأسياً",
+      "moveUpVertTitle": "تحريك مجموعة البلاطات للأعلى رأسياً",
+      "moveNorthTitle": "تحريك مجموعة البلاطات شمالاً",
+      "moveSouthTitle": "تحريك مجموعة البلاطات جنوباً",
+      "moveEastTitle": "تحريك مجموعة البلاطات شرقاً",
+      "moveWestTitle": "تحريك مجموعة البلاطات غرباً",
+      "rotateLeftTitle": "تدوير مجموعة البلاطات عكس عقارب الساعة",
+      "rotateRightTitle": "تدوير مجموعة البلاطات مع عقارب الساعة",
+      "tiltUpTitle": "إمالة مجموعة البلاطات للأعلى",
+      "tiltDnTitle": "إمالة مجموعة البلاطات للأسفل",
+      "offlineBasemapTitle": "مصدر صور خريطة الأساس دون اتصال",
+      "offlineBasemapSource": "مصدر الخريطة",
+      "offlineBasemapTiles": "صور قياسية (data/tiles)",
+      "offlineBasemapPro": "صور جوية (data/pro)",
+      "offlineBasemapVector": "بلاطات متجهة (data/tiles/vector)",
+      "offlineBasemapOsm": "خريطة الشارع المفتوحة (بديل متصل)",
+      "loadSampleTileset": "نموذج تجريبي",
+      "loadSampleTilesetTitle": "تحميل نموذج حرم Meridian ثلاثي الأبعاد المدمج (.b3dm، .i3dm، .pnts، .cmpt)",
+      "editTilesetJsonTitle": "فتح محرر ملف JSON لمجموعة البلاطات",
+      "resetTransform": "إعادة تعيين",
+      "resetTransformTitle": "إعادة موضع ودوران مجموعة البلاطات إلى الإحداثيات الأصلية",
+      "exportTransformTitle": "تصدير مصفوفة التحويل 4×4 بصيغة JSON",
+      "offlineBasemapHint": "اختر مجلد بلاطات الخريطة الذي تستخدمه الكرة الأرضية (قياسي أو جوي)، بشكل مستقل عن البلاطات ثلاثية الأبعاد.",
+      "planBuildTitle": "أدوات التخطيط والقص",
+      "resetStyleShort": "إعادة النمط",
+      "resetStyleTitle": "إعادة نمط مجموعة البلاطات إلى الوضع الافتراضي",
+      "shareTitle": "مشاركة الموقع الحالي",
+      "tabJsonShort": "JSON",
+      "tabJsonTip": "استكشاف بنية JSON لمجموعة البلاطات",
+      "tabMetaShort": "البيانات الوصفية",
+      "tabMetaTip": "فحص البيانات الوصفية وجدول الدفعات",
+      "tabTileShort": "البلاطة",
+      "tabTileTip": "فاحص البلاطات وعناصر التحكم في النمط",
+      "tileHierarchyTitle": "أحجام الإحاطة الهرمية للبلاطات ثلاثية الأبعاد",
+      "tileHierarchyActionsAria": "إجراءات التسلسل الهرمي للبلاطات",
+      "tileHierarchyColorBy": "التلوين حسب",
+      "tileHierarchyColorLod": "عمق مستوى التفاصيل (LOD)",
+      "tileHierarchyColorVolume": "نوع الحجم (كرة / صندوق / منطقة)",
+      "tileHierarchyDepthAll": "جميع العقد",
+      "tileHierarchyDepthLeaves": "البلاطات الطرفية فقط (الطبقات النهائية)",
+      "tileHierarchyDepthMode": "عمق الشجرة",
+      "tileHierarchyHint": "اعرض أحجام الإحاطة للبلاطات ثلاثية الأبعاد في المشهد بألوان مميزة للكرات والصناديق والمناطق. استخدم الوضع الطرفي للطبقات النهائية.",
+      "tileHierarchyLoadAll": "تحميل جميع مستويات التفاصيل للفحص",
+      "tileHierarchyLoadAllShort": "تحميل الكل",
+      "tileHierarchyLoadAllDone": "تم طلب أدق مستوى تفاصيل لمجموعة البلاطات النشطة.",
+      "tileHierarchyLodLabels": "تسميات مستوى التفاصيل (L0، L1…)",
+      "tileHierarchyMaxShapes": "الحد الأقصى للأشكال",
+      "tileHierarchyNoLeaves": "لا توجد بلاطات طرفية محمّلة بعد.",
+      "tileHierarchyNoTileset": "قم بتحميل مجموعة بلاطات ثلاثية الأبعاد أولاً.",
+      "tileHierarchyRefresh": "تحديث طبقة أحجام الإحاطة",
+      "tileHierarchyRestoreLod": "استعادة تدفق مستوى التفاصيل الافتراضي",
+      "tileHierarchyRestoredLod": "تمت استعادة إعدادات مستوى التفاصيل الافتراضية.",
+      "tileHierarchyShowOverlay": "إظهار الطبقة",
+      "tileHierarchyTileset": "مجموعة البلاطات",
+      "tileHierarchyVolAll": "الكل",
+      "tileHierarchyVolBox": "الصناديق فقط",
+      "tileHierarchyVolRegion": "المناطق فقط",
+      "tileHierarchyVolSphere": "الكرات فقط",
+      "tileHierarchyVolumeFilter": "إظهار الأحجام",
+      "tileHierarchyZoomLeaf": "تقريب الكاميرا إلى بلاطة طرفية",
+      "tileHierarchyZoomedLeaf": "تم التقريب إلى البلاطة الطرفية",
+      "searchShort": "بحث",
+      "searchTitle": "البحث عن الأماكن والتسميات ومجموعات البلاطات والإحداثيات",
+      "bookmarksShort": "العلامات",
+      "bookmarksTitle": "حفظ واستعادة العلامات المرجعية للكاميرا",
+      "uploadShort": "رفع نموذج/طبقة",
+      "uploadTitle": "رفع النماذج ثلاثية الأبعاد (GLTF/GLB) والطبقات المكانية",
+      "obliqueShort": "عرض مائل",
+      "obliqueTitle": "زوايا عرض مائلة 45° (شمال/شرق/جنوب/غرب وعمودي)",
+      "shadeShort": "الظلال",
+      "shadeTitle": "تحليل الظلال والإشعاع الشمسي",
+      "geoprocessShort": "أدوات GIS",
+      "geoprocessTitle": "المعالجة الجغرافية وتحرير المتجهات ومشاريع GIS",
+      "perfShort": "الأداء",
+      "perfTitle": "ذاكرة تخزين البلاطات ومراقب الأداء الفوري",
+      "modelsMapShort": "خريطة النماذج",
+      "modelsMapTitle": "عرض جميع النماذج ثلاثية الأبعاد ونطاقاتها على الكرة الأرضية"
     },
     "coordResearch": {
       "heading": "📍 بحث الإحداثيات",
@@ -351,7 +470,11 @@ window.__SIMPLEX_LOCALE_AR = {
       "cancel": "إلغاء",
       "alertTitle": "تنبيه",
       "confirmTitle": "تأكيد",
-      "proInfo": "PRO"
+      "proInfo": "PRO",
+      "info": "معلومة",
+      "success": "نجاح",
+      "warning": "تحذير",
+      "error": "خطأ"
     },
     "status": {
       "aria": "حالة التطبيق",
@@ -366,7 +489,8 @@ window.__SIMPLEX_LOCALE_AR = {
       "tiles": "البلاطات",
       "features": "العناصر",
       "fps": "FPS",
-      "statsAria": "إحصاءات المشهد"
+      "statsAria": "إحصاءات المشهد",
+      "sceneHeading": "المشهد"
     },
     "directions": {
       "lead": "مسار مستقيم على إهليلج WGS84 (دائرة عظمى / جيوديسي). توجيه الطرق يبقى في تطبيقك الخارجي؛ هذا العارض لا يستدعي واجهات خرائط طرف ثالث.",
@@ -460,6 +584,32 @@ window.__SIMPLEX_LOCALE_AR = {
       "dangerLead": "تؤثر إعادة التعيين على تخزين المتصفح فقط، وليس ملفات المستودع.",
       "resetRuntime": "إعادة تعيين تجاوزات التشغيل",
       "resetAllPrefs": "إعادة تعيين التجاوزات وجميع التفضيلات المحلية"
+    },
+    "displayModesModal": {
+      "title": "أوضاع العرض",
+      "subtitle": "اضبط أساليب العرض وطبقات التحليل والسياق البصري للمشهد الحالي.",
+      "closeAria": "إغلاق أوضاع العرض",
+      "sectionViz": "التصور البصري",
+      "statusReady": "جاهز",
+      "statusApplying": "جارٍ تطبيق وضع العرض…",
+      "sectionRendering": "أوضاع الإظهار",
+      "wireframe": "الوضع السلكي",
+      "solid": "الوضع المصمت",
+      "contours": "خطوط الكنتور / المياه",
+      "sectionAnalysis": "أوضاع التحليل",
+      "slope": "تحليل الانحدار",
+      "groundLevel": "عرض مستوى الأرض",
+      "sectionVisualFx": "التأثيرات البصرية",
+      "compass": "طبقة البوصلة",
+      "lighting": "إضاءة الكرة الأرضية",
+      "clouds": "السحب / الغلاف الجوي",
+      "grid": "الشبكة / الطبقات المعيارية",
+      "sectionWeather": "تأثيرات الطقس",
+      "weatherNone": "بدون",
+      "weatherSnow": "ثلج",
+      "weatherRain": "مطر",
+      "sectionVertExag": "المبالغة الرأسية",
+      "resetBtn": "إعادة التعيين للافتراضي"
     }
   },
   "registry": {
@@ -698,7 +848,9 @@ window.__SIMPLEX_LOCALE_AR = {
       "qualityLow": "منخفض",
       "qualityMedium": "متوسط",
       "qualityHigh": "عالٍ",
-      "qualityUltra": "فائق"
+      "qualityUltra": "فائق",
+      "langOptionEn": "الإنجليزية",
+      "langOptionAr": "العربية"
     },
     "scene": {
       "heroLead": "يتحكم برؤية ووضع «PRO» للشريط الفرعي، أزرار التحليل، وشريط أدوات الخريطة. يطابق <code>smart3dToolbarWireup.applyConfigVisibility</code>.",
@@ -713,7 +865,14 @@ window.__SIMPLEX_LOCALE_AR = {
       "density": "الكثافة",
       "minBrightness": "أدنى سطوع",
       "heightDiv": "ارتفاع÷",
-      "widthFactor": "عامل العرض"
+      "widthFactor": "عامل العرض",
+      "gridSamples": "عينات الشبكة",
+      "imageryBrightness": "سطوع الصور الفضائية",
+      "imageryContrast": "تباين الصور الفضائية",
+      "sceneTuningSummary": "ضبط المشهد والصور",
+      "thresholdDeg1": "عتبة الانحدار الخفيف (°)",
+      "thresholdDeg2": "عتبة الانحدار المتوسط (°)",
+      "thresholdDeg3": "عتبة الانحدار الشديد (°)"
     },
     "project": {
       "notLoaded": "فهرس المشروع غير محمّل. تأكد من تضمين <code>projectIntegrationIndex.js</code> قبل مركز التحكم.",
@@ -873,7 +1032,9 @@ window.__SIMPLEX_LOCALE_AR = {
     "lonShort": "خط الطول:",
     "heightShort": "الارتفاع:",
     "copyLatLonDecimal": "نسخ خط العرض والطول (عشري)",
-    "noContentUri": "(لا يوجد URI للمحتوى)"
+    "noContentUri": "(لا يوجد URI للمحتوى)",
+    "pathNotReachable": "مسار مجموعة البلاطات غير قابل للوصول",
+    "pathVerifyTimeout": "انتهت مهلة التحقق"
   },
   "db": {
     "totalTilesets": "إجمالي Tilesets",

@@ -77,7 +77,7 @@ class CutByPolygonManager {
                     </div>
 
                     <div class="cut-by-polygon-actions">
-                        <button class="btn btn-primary" id="drawPolygonBtn">
+                        <button class="btn btn-primary" id="cutDrawPolygonBtn">
                             <span>✏️</span> Draw Polygon
                         </button>
                         <button class="btn" id="clearCutBtn" style="display: none;">
@@ -128,7 +128,7 @@ class CutByPolygonManager {
         });
 
         // Draw polygon
-        document.getElementById('drawPolygonBtn')?.addEventListener('click', () => {
+        document.getElementById('cutDrawPolygonBtn')?.addEventListener('click', () => {
             this.startDrawingPolygon();
         });
 
@@ -220,7 +220,8 @@ class CutByPolygonManager {
         }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
         // Update UI
-        document.getElementById('drawPolygonBtn').style.display = 'none';
+        const drawBtn = document.getElementById('cutDrawPolygonBtn');
+        if (drawBtn) drawBtn.style.display = 'none';
         document.getElementById('clearCutBtn').style.display = 'inline-flex';
 
         if (window.notification) {
@@ -593,10 +594,13 @@ class CutByPolygonManager {
         this.previewEntity = null;
         this.isActive = false;
 
-        // Update UI
-        document.getElementById('cutByPolygonToggle').checked = false;
-        document.getElementById('drawPolygonBtn').style.display = 'inline-flex';
-        document.getElementById('clearCutBtn').style.display = 'none';
+        // Update UI (null-safe for headless or closed-modal invocations)
+        const toggleEl = document.getElementById('cutByPolygonToggle');
+        const drawBtn = document.getElementById('cutDrawPolygonBtn');
+        const clearBtn = document.getElementById('clearCutBtn');
+        if (toggleEl) toggleEl.checked = false;
+        if (drawBtn) drawBtn.style.display = 'inline-flex';
+        if (clearBtn) clearBtn.style.display = 'none';
 
         this.stopDrawing();
 
@@ -627,8 +631,22 @@ class CutByPolygonManager {
         }
 
         const viewer = this.tilesetViewer?.viewer;
-        if (viewer) {
+        if (viewer?.canvas) {
             viewer.canvas.style.cursor = 'default';
+        }
+    }
+
+    /**
+     * Cancel an active polygon drawing or cut session (called by ToolManager / Escape key).
+     */
+    cancelCutting() {
+        this.stopDrawing();
+        const drawBtn = document.getElementById('cutDrawPolygonBtn');
+        if (drawBtn && !this.cutPolygon) {
+            drawBtn.style.display = 'inline-flex';
+        }
+        if (window.app && typeof window.app.clearToolStatus === 'function') {
+            window.app.clearToolStatus();
         }
     }
 

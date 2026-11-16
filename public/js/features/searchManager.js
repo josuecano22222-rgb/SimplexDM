@@ -379,8 +379,8 @@ class SearchManager {
             return 'coordinates';
         }
         
-        // Check for UTM format (e.g., "Zone 40N 465000 6035000")
-        if (/zone\s*\d{1,2}[NS]\s*\d+\.?\d*\s*\d+\.?\d*/i.test(trimmed)) {
+        // Check for UTM format (e.g., "Zone 40N 465000 6035000" or "31U 629580E 5803590N")
+        if (/^(?:zone\s*)?\d{1,2}\s*[C-HJ-NP-XNS]\s+\d{5,7}(?:\.\d+)?\s*E?[\s,]+\d{5,8}(?:\.\d+)?\s*N?$/i.test(trimmed)) {
             return 'coordinates';
         }
         
@@ -427,6 +427,40 @@ class SearchManager {
         try {
             // Use Nominatim geocoding API (free, no API key required)
             // Rate limit: 1 request per second, so we'll use it carefully
+            // 1. Offline-first: query local SQLite world + installed region label databases
+            if (window.electronAPI?.gis?.labels?.search) {
+                try {
+                    const activeRegions = Array.isArray(window.labelManager?._activeRegions)
+                        ? window.labelManager._activeRegions
+                        : [];
+                    const localHits = await window.electronAPI.gis.labels.search(
+                        trimmed,
+                        { maxResults: 8 },
+                        activeRegions
+                    );
+                    if (Array.isArray(localHits)) {
+                        localHits.forEach((row) => {
+                            const lon = Number(row.lon);
+                            const lat = Number(row.lat);
+                            if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
+                            const labelParts = [row.name || row.name_en || row.name_ar];
+                            if (row.name_en && row.name_en !== labelParts[0]) labelParts.push(row.name_en);
+                            if (row.type) labelParts.push(`(${row.type})`);
+                            results.push({
+                                type: 'address',
+                                name: labelParts.filter(Boolean).join(' · '),
+                                coordinates: { lon, lat, height: 0 },
+                                data: { ...row, lon, lat },
+                                source: 'offline-labels',
+                            });
+                        });
+                    }
+                } catch (_) {
+                    /* non-fatal; continue to online fallback */
+                }
+            }
+
+            // 2. Online OpenStreetMap Nominatim lookup (gracefully skipped when offline)
             const encodedQuery = encodeURIComponent(trimmed);
             const url = `https://nominatim.openstreetmap.org/search?q=${encodedQuery}&format=json&limit=5&addressdetails=1`;
             
@@ -476,8 +510,8 @@ class SearchManager {
             }
             return { results, nominatimFailed: false };
         } catch (error) {
-            // Offline-first: don't show a generic error; let caller decide messaging
-            return { results, nominatimFailed: true };
+            // Offline-first: only flag nominatimFailed if offline label DB also produced no results
+            return { results, nominatimFailed: results.length === 0 };
         }
         return { results, nominatimFailed: false };
     }
@@ -529,6 +563,25 @@ class SearchManager {
             }
         }
         
+        // Support compact & verbose UTM coordinates (e.g., "31U 629580 5803590", "Zone 31N 629580E 5803590N")
+        if (lon === undefined || lat === undefined) {
+            const utmCompact = trimmed.match(
+                /^(?:zone\s*)?(\d{1,2})\s*([C-HJ-NP-XNS])\s+(\d{5,7}(?:\.\d+)?)\s*E?[\s,]+(\d{5,8}(?:\.\d+)?)\s*N?$/i
+            );
+            if (utmCompact && window.CoordinateManager?.utmToWgs84) {
+                const decoded = window.CoordinateManager.utmToWgs84(
+                    parseInt(utmCompact[1], 10),
+                    utmCompact[2],
+                    parseFloat(utmCompact[3]),
+                    parseFloat(utmCompact[4])
+                );
+                if (decoded) {
+                    lon = decoded.lon;
+                    lat = decoded.lat;
+                }
+            }
+        }
+
         // Fallback: plain numeric pairs (comma/space) when the full parser did not match
         if (lon === undefined || lat === undefined) {
             const parts = trimmed.split(/[,\s]+/).map((p) => p.trim()).filter((p) => p);

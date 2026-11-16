@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'arena/**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Syntax, i18n, Tests & Production Bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies (preserve Node ABI for tests)
+        env:
+          SKIP_ELECTRON_REBUILD: '1'
+        run: npm ci
+
+      - name: Verify Cesium runtime & workspace setup
+        run: npm run setup
+
+      - name: Verify EN/AR i18n locale parity
+        run: npm run i18n:check
+
+      - name: Verify Python tooling syntax
+        run: |
+          python3 -m py_compile \
+            scripts/build_world_labels.py \
+            scripts/pack_region.py \
+            scripts/seed_world_labels.py \
+            data/map_offline.py \
+            data/update_meta.py
+
+      - name: Run Jest unit & integration test suite
+        run: npm test -- --ci --runInBand
+
+      - name: Build brand assets & production Webpack bundle
+        run: npm run webpack
+
+      - name: Verify production bundle artifacts
+        run: |
+          test -f public-bundled/index.html
+          test -f public-bundled/landing.html
+          test -f public-bundled/admin.html
+          test -f build/icon.png
+          test -f build/icon.ico
+          test -f build/icon.icns
+          ls public-bundled/js/bundle.*.js

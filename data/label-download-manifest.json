@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-11-16T00:00:00Z",
+  "description": "Meridian (SimplexDM v2.0.0) offline map label manifest. A curated world base database (data/labels-world-base.db) and Amsterdam Metro sample region pack (data/samples/amsterdam-labels.rlp) ship pre-installed. Build custom city or country packs from any OpenStreetMap extract using scripts/build_world_labels.py and scripts/pack_region.py, or configure HTTPS mirrors below.",
+  "worldBase": {
+    "id": "world-base",
+    "name": "World Base Labels (OSM + Natural Earth Starter)",
+    "fileName": "labels-world-base.db",
+    "url": "",
+    "sha256": "25fd7a1f4d57412f6c50d0dc08505ed0cc926d810ee5a6c237720f62094cb2f5",
+    "sizeBytes": 77824,
+    "labelCount": 170,
+    "zoom": [0, 14]
+  },
+  "regions": [
+    {
+      "id": "nl-amsterdam-metro",
+      "name": "Amsterdam Metropolitan Area (Bundled Sample)",
+      "localPath": "data/samples/amsterdam-labels.rlp",
+      "url": "",
+      "sha256": "8f890a54987ff57a1b945360ae241f7830fa647f996b2e760e943c15d7c00d61",
+      "sizeBytes": 3549,
+      "labelCount": 15,
+      "bbox": [4.72, 52.28, 5.08, 52.44],
+      "zoom": [8, 19]
+    }
+  ]
+}

@@ -371,6 +371,56 @@ class TileInspectorUI {
     toggleTileset() {
         if (window.tileInspector && window.tileInspector.tileset) {
             window.tileInspector.tileset.show = !window.tileInspector.tileset.show;
+            window.tilesetViewer?.viewer?.scene?.requestRender?.();
+        }
+    }
+
+    /**
+     * Analyze active tile / selected feature using `tileInspector` and `b3dmFeatureExtractor`.
+     */
+    analyzeFeature(featureOrTile) {
+        if (window.app && typeof window.app.switchInspectorTab === 'function') {
+            window.app.switchInspectorTab('tile');
+        }
+        if (featureOrTile && window.b3dmFeatureExtractor) {
+            try {
+                const extracted = window.b3dmFeatureExtractor.extractFromCesiumTile(featureOrTile);
+                if (extracted) {
+                    const summary = window.b3dmFeatureExtractor.summarizeFeatures(extracted);
+                    this.updateStats?.({
+                        loadedTiles: 1,
+                        totalFeatures: summary.featureCount,
+                        totalProperties: summary.propertyCount,
+                    });
+                    if (summary.properties) {
+                        this.updatePropertyList?.(Object.keys(summary.properties));
+                    }
+                    return summary;
+                }
+            } catch (err) {
+                console.warn('B3DM feature extraction warning:', err);
+            }
+        }
+        if (typeof this.analyzeTiles === 'function') {
+            return this.analyzeTiles();
+        }
+        return null;
+    }
+
+    /**
+     * Open the Tile Inspector tab and scroll/focus the style controls section.
+     */
+    showStyleOptions() {
+        if (window.app && typeof window.app.switchInspectorTab === 'function') {
+            window.app.switchInspectorTab('tile');
+        }
+        const styleTarget =
+            document.getElementById('inspectorApplyStyleBtn') ||
+            document.getElementById('inspectorPropertySelect') ||
+            document.getElementById('tileTab');
+        if (styleTarget && typeof styleTarget.scrollIntoView === 'function') {
+            styleTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            styleTarget.focus?.();
         }
     }
 }

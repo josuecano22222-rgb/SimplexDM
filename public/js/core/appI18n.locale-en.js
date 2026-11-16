@@ -29,6 +29,13 @@ window.__SIMPLEX_LOCALE_EN = {
         "radius": "Radius"
       }
     },
+    "tools": {
+      "search": "Search",
+      "bookmarks": "Bookmarks",
+      "upload": "Upload",
+      "collaborate": "Collaborate",
+      "performance": "Performance"
+    },
     "toolbar": {
       "transparency": "Transparency",
       "fog": "Fog",
@@ -85,9 +92,19 @@ window.__SIMPLEX_LOCALE_EN = {
     }
   },
   "ui": {
+    "a11y": {
+      "skipToViewport": "Skip to 3D viewport"
+    },
     "brand": {
       "name": "Meridian",
       "sub": "Reality Planning Platform"
+    },
+    "tools": {
+      "search": "Search",
+      "bookmarks": "Bookmarks",
+      "upload": "Upload",
+      "collaborate": "Collaborate",
+      "performance": "Performance"
     },
     "nav": {
       "home": "Home",
@@ -151,7 +168,16 @@ window.__SIMPLEX_LOCALE_EN = {
         "school": "School",
         "poi": "POI",
         "custom": "Custom"
-      }
+      },
+      "downloadData": "Label database",
+      "downloadHint": "Download label data over HTTPS into app storage or import a local .rlp pack.",
+      "downloadWorld": "Download world DB",
+      "downloadWorldDone": "World label database installed.",
+      "downloadRegionUrl": "Download region pack",
+      "downloadRegionDone": "Region label pack installed.",
+      "worldUrlPlaceholder": "https://…/labels-world-base.db",
+      "regionUrlPlaceholder": "https://…/region.rlp",
+      "regionUrlRequired": "Please enter an HTTPS URL for the .rlp region pack."
     },
     "restore": {
       "leftTitle": "Toggle layers & regions",
@@ -202,7 +228,9 @@ window.__SIMPLEX_LOCALE_EN = {
       "coordLon": "Longitude",
       "coordLat": "Latitude",
       "coordHeight": "Height",
-      "coordUnitM": " m"
+      "coordUnitM": " m",
+      "displayModesAdvancedAria": "Open advanced display modes",
+      "displayModesAdvancedTitle": "Advanced display modes"
     },
     "rightSidebar": {
       "aria": "Viewer controls",
@@ -285,7 +313,98 @@ window.__SIMPLEX_LOCALE_EN = {
       "resetStyle": " Reset",
       "inspectorExportGroup": "Export",
       "exportFeatures": " Features",
-      "exportProperties": " Properties"
+      "exportProperties": " Properties",
+      "applyStyleShort": "Apply style",
+      "applyStyleTitle": "Apply tileset style",
+      "clearAllTitle": "Clear active tools and measurements",
+      "commentTitle": "Annotations & collaboration",
+      "exportFeaturesShort": "Export features",
+      "exportFeaturesTitle": "Export inspected features as JSON",
+      "exportPropertiesShort": "Export properties",
+      "exportPropertiesTitle": "Export tile properties as JSON",
+      "inspectorAnalyzeShort": "Analyze",
+      "inspectorAnalyzeTitle": "Analyze B3DM/tile features and metadata",
+      "inspectorResetShort": "Reset view",
+      "inspectorResetTitle": "Reset camera view to active tileset",
+      "inspectorToggleShort": "Toggle tileset",
+      "inspectorToggleTitle": "Show or hide active tileset",
+      "moveDownVertTitle": "Move tileset down vertically",
+      "moveUpVertTitle": "Move tileset up vertically",
+      "moveNorthTitle": "Move tileset north",
+      "moveSouthTitle": "Move tileset south",
+      "moveEastTitle": "Move tileset east",
+      "moveWestTitle": "Move tileset west",
+      "rotateLeftTitle": "Rotate tileset counter-clockwise",
+      "rotateRightTitle": "Rotate tileset clockwise",
+      "tiltUpTitle": "Tilt tileset up",
+      "tiltDnTitle": "Tilt tileset down",
+      "offlineBasemapTitle": "Offline basemap imagery source",
+      "offlineBasemapSource": "Map source",
+      "offlineBasemapTiles": "Standard imagery (data/tiles)",
+      "offlineBasemapPro": "Aerial imagery (data/pro)",
+      "offlineBasemapVector": "Vector tiles (data/tiles/vector)",
+      "offlineBasemapOsm": "OpenStreetMap (online fallback)",
+      "loadSampleTileset": "Sample 3D",
+      "loadSampleTilesetTitle": "Load bundled Meridian Campus 3D Tiles showcase (.b3dm, .i3dm, .pnts, .cmpt)",
+      "editTilesetJsonTitle": "Open Tileset JSON File Editor",
+      "resetTransform": "Reset",
+      "resetTransformTitle": "Reset tileset position and rotation to original survey coordinates",
+      "exportTransformTitle": "Export 4×4 tileset transform matrix as JSON",
+      "offlineBasemapHint": "Choose which raster/vector tile folder the globe uses (standard vs aerial). Independent of 3D tilesets.",
+      "planBuildTitle": "Plan & cut tools",
+      "resetStyleShort": "Reset style",
+      "resetStyleTitle": "Reset tileset style to default",
+      "shareTitle": "Share current location",
+      "tabJsonShort": "JSON",
+      "tabJsonTip": "Explore tileset JSON hierarchy",
+      "tabMetaShort": "Metadata",
+      "tabMetaTip": "Inspect feature and batch table metadata",
+      "tabTileShort": "Tile",
+      "tabTileTip": "Tile inspector and style controls",
+      "tileHierarchyTitle": "3D Tiles hierarchy bounding volumes",
+      "tileHierarchyActionsAria": "Tile hierarchy actions",
+      "tileHierarchyColorBy": "Color by",
+      "tileHierarchyColorLod": "LOD depth",
+      "tileHierarchyColorVolume": "Volume type (sphere / box / region)",
+      "tileHierarchyDepthAll": "All nodes",
+      "tileHierarchyDepthLeaves": "Leaf tiles only (final layers)",
+      "tileHierarchyDepthMode": "Tree depth",
+      "tileHierarchyHint": "Show 3D Tiles bounding volumes in the scene: spheres, boxes, and regions use different colors. Use leaf mode for final layers. Separate from the JSON tab.",
+      "tileHierarchyLoadAll": "Force-load all LOD levels for inspection",
+      "tileHierarchyLoadAllShort": "Load all",
+      "tileHierarchyLoadAllDone": "Requested finest LOD tiles for active tileset.",
+      "tileHierarchyLodLabels": "LOD labels (L0, L1…)",
+      "tileHierarchyMaxShapes": "Max shapes",
+      "tileHierarchyNoLeaves": "No leaf tiles are loaded yet.",
+      "tileHierarchyNoTileset": "Load a 3D tileset first.",
+      "tileHierarchyRefresh": "Refresh bounding volume overlay",
+      "tileHierarchyRestoreLod": "Restore default LOD streaming",
+      "tileHierarchyRestoredLod": "Restored default LOD settings.",
+      "tileHierarchyShowOverlay": "Show overlay",
+      "tileHierarchyTileset": "Tileset",
+      "tileHierarchyVolAll": "All",
+      "tileHierarchyVolBox": "Boxes only",
+      "tileHierarchyVolRegion": "Regions only",
+      "tileHierarchyVolSphere": "Spheres only",
+      "tileHierarchyVolumeFilter": "Show volumes",
+      "tileHierarchyZoomLeaf": "Zoom camera to a leaf tile",
+      "tileHierarchyZoomedLeaf": "Zoomed to leaf tile",
+      "searchShort": "Search",
+      "searchTitle": "Search places, labels, tilesets, and coordinates",
+      "bookmarksShort": "Bookmarks",
+      "bookmarksTitle": "Save and restore camera bookmarks",
+      "uploadShort": "Upload",
+      "uploadTitle": "Upload 3D models (GLTF/GLB) and spatial layers",
+      "obliqueShort": "Oblique",
+      "obliqueTitle": "Oblique 45° camera views (N/E/S/W & Nadir)",
+      "shadeShort": "Shade",
+      "shadeTitle": "Solar shadow and shade analysis",
+      "geoprocessShort": "GIS Tools",
+      "geoprocessTitle": "Geoprocessing, vector editing, and GIS project tools",
+      "perfShort": "Performance",
+      "perfTitle": "3D tile cache & real-time performance monitor",
+      "modelsMapShort": "Models Map",
+      "modelsMapTitle": "View all loaded 3D models and footprints on the globe"
     },
     "coordResearch": {
       "heading": "📍 Coordinate Research",
@@ -351,7 +470,11 @@ window.__SIMPLEX_LOCALE_EN = {
       "cancel": "Cancel",
       "alertTitle": "Alert",
       "confirmTitle": "Confirm",
-      "proInfo": "PRO"
+      "proInfo": "PRO",
+      "info": "Information",
+      "success": "Success",
+      "warning": "Warning",
+      "error": "Error"
     },
     "status": {
       "aria": "Application status",
@@ -366,7 +489,8 @@ window.__SIMPLEX_LOCALE_EN = {
       "tiles": "Tiles",
       "features": "Features",
       "fps": "FPS",
-      "statsAria": "Scene statistics"
+      "statsAria": "Scene statistics",
+      "sceneHeading": "Scene"
     },
     "directions": {
       "lead": "Straight-line path on the WGS84 ellipsoid (great-circle / geodesic). Road routing stays in your preferred external app; this viewer does not call third-party map APIs.",
@@ -460,6 +584,32 @@ window.__SIMPLEX_LOCALE_EN = {
       "dangerLead": "Resets only affect browser storage, not your repo files.",
       "resetRuntime": "Reset runtime overrides",
       "resetAllPrefs": "Reset runtime + all local prefs"
+    },
+    "displayModesModal": {
+      "title": "Display modes",
+      "subtitle": "Tune rendering, analysis overlays, and visual context for the current view.",
+      "closeAria": "Close display modes",
+      "sectionViz": "Visualization",
+      "statusReady": "Ready",
+      "statusApplying": "Applying display mode…",
+      "sectionRendering": "Rendering modes",
+      "wireframe": "Wireframe mode",
+      "solid": "Solid mode",
+      "contours": "Contours / water lines",
+      "sectionAnalysis": "Analysis modes",
+      "slope": "Slope analysis",
+      "groundLevel": "Ground level view",
+      "sectionVisualFx": "Visual effects",
+      "compass": "Compass overlay",
+      "lighting": "Globe lighting",
+      "clouds": "Clouds / sky atmosphere",
+      "grid": "Grid / modular overlays",
+      "sectionWeather": "Weather effects",
+      "weatherNone": "None",
+      "weatherSnow": "Snow",
+      "weatherRain": "Rain",
+      "sectionVertExag": "Vertical exaggeration",
+      "resetBtn": "Reset to defaults"
     }
   },
   "registry": {
@@ -698,7 +848,9 @@ window.__SIMPLEX_LOCALE_EN = {
       "qualityLow": "low",
       "qualityMedium": "medium",
       "qualityHigh": "high",
-      "qualityUltra": "ultra"
+      "qualityUltra": "ultra",
+      "langOptionEn": "English",
+      "langOptionAr": "Arabic (العربية)"
     },
     "scene": {
       "heroLead": "Controls visibility and “PRO” gating for the sub-toolbar, analysis buttons, and the map tool strip. Matches <code>smart3dToolbarWireup.applyConfigVisibility</code>.",
@@ -713,7 +865,14 @@ window.__SIMPLEX_LOCALE_EN = {
       "density": "density",
       "minBrightness": "min brightness",
       "heightDiv": "height÷",
-      "widthFactor": "width factor"
+      "widthFactor": "width factor",
+      "gridSamples": "Grid samples",
+      "imageryBrightness": "Imagery brightness",
+      "imageryContrast": "Imagery contrast",
+      "sceneTuningSummary": "Scene & imagery tuning",
+      "thresholdDeg1": "Gentle threshold (°)",
+      "thresholdDeg2": "Moderate threshold (°)",
+      "thresholdDeg3": "Steep threshold (°)"
     },
     "project": {
       "notLoaded": "Project index not loaded. Ensure <code>projectIntegrationIndex.js</code> is included before Control Center.",
@@ -873,7 +1032,9 @@ window.__SIMPLEX_LOCALE_EN = {
     "lonShort": "Lon:",
     "heightShort": "Height:",
     "copyLatLonDecimal": "Copy lat, lon (decimal)",
-    "noContentUri": "(no content URI)"
+    "noContentUri": "(no content URI)",
+    "pathNotReachable": "Tileset path is not reachable",
+    "pathVerifyTimeout": "Verification timed out"
   },
   "db": {
     "totalTilesets": "Total Tilesets",

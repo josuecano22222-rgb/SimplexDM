@@ -40,23 +40,43 @@
         const el = root || document;
         el.querySelectorAll('[data-i18n]').forEach((node) => {
             const k = node.getAttribute('data-i18n');
-            if (k) node.textContent = t(k);
+            if (!k) return;
+            const val = t(k);
+            if (val !== k || !node.textContent.trim()) {
+                node.textContent = val;
+            }
         });
         el.querySelectorAll('[data-i18n-title]').forEach((node) => {
             const k = node.getAttribute('data-i18n-title');
-            if (k) node.setAttribute('title', t(k));
+            if (!k) return;
+            const val = t(k);
+            if (val !== k || !node.getAttribute('title')) {
+                node.setAttribute('title', val);
+            }
         });
         el.querySelectorAll('[data-i18n-placeholder]').forEach((node) => {
             const k = node.getAttribute('data-i18n-placeholder');
-            if (k) node.setAttribute('placeholder', t(k));
+            if (!k) return;
+            const val = t(k);
+            if (val !== k || !node.getAttribute('placeholder')) {
+                node.setAttribute('placeholder', val);
+            }
         });
         el.querySelectorAll('[data-i18n-aria]').forEach((node) => {
             const k = node.getAttribute('data-i18n-aria');
-            if (k) node.setAttribute('aria-label', t(k));
+            if (!k) return;
+            const val = t(k);
+            if (val !== k || !node.getAttribute('aria-label')) {
+                node.setAttribute('aria-label', val);
+            }
         });
         el.querySelectorAll('[data-i18n-html]').forEach((node) => {
             const k = node.getAttribute('data-i18n-html');
-            if (k) node.innerHTML = t(k);
+            if (!k) return;
+            const val = t(k);
+            if (val !== k || !node.innerHTML.trim()) {
+                node.innerHTML = val;
+            }
         });
     }
 

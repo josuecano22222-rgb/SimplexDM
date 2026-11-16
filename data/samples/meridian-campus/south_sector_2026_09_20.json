@@ -1,0 +1,64 @@
+{
+  "asset": {
+    "version": "1.0",
+    "tilesetVersion": "2026.09.20",
+    "gltfUpAxis": "Y",
+    "extras": {
+      "name": "Meridian Campus — South Sector (2026 Survey)",
+      "surveyDate": "2026-09-20",
+      "crs": "EPSG:4978 (WGS84 ECEF)",
+      "gsdCm": 3,
+      "buildings": 4
+    }
+  },
+  "properties": {
+    "height_m": {
+      "minimum": 14,
+      "maximum": 48
+    },
+    "floors": {
+      "minimum": 3,
+      "maximum": 12
+    },
+    "year_built": {
+      "minimum": 2022,
+      "maximum": 2026
+    }
+  },
+  "geometricError": 64,
+  "root": {
+    "transform": [
+      -0.085488,
+      0.996339,
+      0,
+      0,
+      -0.789045,
+      -0.067702,
+      0.610593,
+      0,
+      0.608358,
+      0.052199,
+      0.791944,
+      0,
+      3888360.886994,
+      333630.410966,
+      5027882.274791,
+      1
+    ],
+    "boundingVolume": {
+      "region": [
+        0.08557349,
+        0.91396959,
+        0.08561189,
+        0.9139853,
+        0,
+        54
+      ]
+    },
+    "geometricError": 0,
+    "refine": "ADD",
+    "content": {
+      "uri": "south_buildings.b3dm"
+    }
+  }
+}

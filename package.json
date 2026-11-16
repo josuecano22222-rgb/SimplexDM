@@ -20,9 +20,17 @@
     "build:win-portable": "npm run webpack && electron-builder --win portable",
     "package": "npm run webpack && electron-builder",
     "package:all": "npm run webpack && electron-builder --win --mac --linux",
+    "start": "node server/server.js",
     "start:server": "node server/server.js",
     "build:toolbar-icons": "node public/Style/build-toolbar-icons.mjs",
-    "postinstall": "node scripts/setup.js && electron-rebuild -f -w better-sqlite3",
+    "i18n:emit": "node scripts/emit-locale.mjs",
+    "i18n:check": "node scripts/emit-locale.mjs --check",
+    "seed:labels": "python3 scripts/seed_world_labels.py",
+    "seed:samples": "node scripts/generate-sample-tileset.mjs",
+    "setup": "node scripts/setup.js --copy-cesium",
+    "setup:cesium": "node scripts/setup.js --copy-cesium",
+    "rebuild": "node scripts/rebuild-native.js",
+    "postinstall": "node scripts/setup.js && node scripts/rebuild-native.js",
     "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch --passWithNoTests",
@@ -48,28 +56,30 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/SimplexDM.git"
+    "url": "https://github.com/josuecano22222-rgb/SimplexDM.git"
   },
   "bugs": {
-    "url": "https://github.com/your-username/SimplexDM/issues"
+    "url": "https://github.com/josuecano22222-rgb/SimplexDM/issues"
   },
-  "homepage": "https://github.com/your-username/SimplexDM#readme",
+  "homepage": "https://github.com/josuecano22222-rgb/SimplexDM#readme",
   "engines": {
-    "node": ">=16.0.0",
-    "npm": ">=7.0.0"
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.13",
     "@babel/preset-env": "^7.29.2",
     "@electron/rebuild": "^4.0.3",
     "@jest/globals": "^29.7.0",
     "@resvg/resvg-js": "^2.6.2",
+    "babel-loader": "^10.1.1",
     "copy-webpack-plugin": "^14.0.0",
     "cross-env": "^7.0.3",
     "electron": "^40.0.0",
     "electron-builder": "^26.6.0",
     "html-webpack-plugin": "^5.6.0",
     "jest": "^29.7.0",
-    "jest-environment-jsdom": "^30.3.0",
+    "jest-environment-jsdom": "^29.7.0",
     "png-to-ico": "^3.0.1",
     "png2icons": "^2.0.1",
     "terser-webpack-plugin": "^5.3.10",
@@ -111,7 +121,10 @@
     ],
     "asar": true,
     "asarUnpack": [
-      "server/**/*"
+      "server/**/*",
+      "main/gis/workers/**/*",
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/jsts/dist/**/*"
     ],
     "extraFiles": [
       {

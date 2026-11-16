@@ -1,117 +1,148 @@
 /**
  * StreetViewManager
- * Street View integration (Meridian Design - Page 48)
- * Features: Location display, coordinate tracking
- * NOTE: This application runs offline. Immersive street-level imagery is not bundled.
+ * Immersive first-person ground-level 3D walkthrough inside loaded 3D Tiles & terrain.
+ *
+ * Works 100% offline directly in the Cesium 3D viewport:
+ * - Enter at current camera location or click any street/plaza point on the 3D scene
+ * - Configurable pedestrian eye height (1.2 m – 15 m, default 1.7 m) and FOV (45° – 110°)
+ * - Smooth click-drag 360° look, WASD / Arrow walking (Shift to move faster), Q/E turn
+ * - Accessible on-screen step/turn controls & live heading/coordinate HUD bar
+ * - Clean exit (`Esc` or Exit button) restoring the exact pre-Street-View orbit camera & FOV
  */
 
 class StreetViewManager {
     constructor() {
         this.tilesetViewer = null;
         this.modal = null;
-        this.streetViewPanel = null;
+        this.hud = null;
         this.isActive = false;
+        this.isSelectingLocation = false;
+        /** @type {{ lon:number, lat:number, groundHeight:number, eyeOffset:number }|null} */
         this.currentPosition = null;
-        this.offlineMode = true; // Running in offline mode
+        this.eyeHeight = 1.7;
+        this.walkSpeed = 4.5; // m/s
+        this.fovDeg = 75;
+        this.offlineMode = true;
+
+        this._savedCamera = null;
         this._lookHandler = null;
-        this._isLookEnabled = false;
-        this._lockedDestination = null;
+        this._pickHandler = null;
+        this._isDraggingLook = false;
         this._lookLast = null;
-        this._heading = 0;
-        this._pitch = 0;
-        this._sensitivity = 0.002;
+        this._heading = 0; // radians
+        this._pitch = 0; // radians
+        this._sensitivity = 0.0026;
+        this._keys = new Set();
+        this._keydownHandler = null;
+        this._keyupHandler = null;
+        this._rafId = null;
+        this._lastStepMs = 0;
+
         this.init();
     }
 
+    static formatCardinal(headingDeg) {
+        const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+        const norm = ((Number(headingDeg) || 0) % 360 + 360) % 360;
+        return dirs[Math.round(norm / 45) % 8];
+    }
+
+    isStreetViewImageryAvailable() {
+        // First-person 3D scene street view is always available offline.
+        return true;
+    }
+
     lockViewerInputs() {
-        const scene = this.tilesetViewer?.viewer?.scene;
+        const scene = this._getViewer()?.scene;
         if (!scene?.screenSpaceCameraController) return;
+        if (this._hasLock) return;
+        this._hasLock = true;
         window.__simplexInputLocks = (window.__simplexInputLocks || 0) + 1;
         scene.screenSpaceCameraController.enableInputs = false;
     }
 
     unlockViewerInputs() {
-        const scene = this.tilesetViewer?.viewer?.scene;
-        if (!scene?.screenSpaceCameraController) return;
+        const scene = this._getViewer()?.scene;
+        if (!this._hasLock) return;
+        this._hasLock = false;
         window.__simplexInputLocks = Math.max(0, (window.__simplexInputLocks || 0) - 1);
-        scene.screenSpaceCameraController.enableInputs = window.__simplexInputLocks === 0;
-    }
-
-    /**
-     * Initialize street view manager
-     */
-    init() {
-        this.tilesetViewer = window.tilesetViewer;
-        this.createStreetViewModal();
-        this.setupEventHandlers();
-    }
-
-    /**
-     * Whether third-party street-level imagery is available (not in offline builds).
-     */
-    isStreetViewImageryAvailable() {
-        return false;
-    }
-
-    /**
-     * Create Street View modal
-     */
-    createStreetViewModal() {
-        // Remove existing if any
-        const existing = document.getElementById('streetViewModal');
-        if (existing) {
-            existing.remove();
+        if (scene?.screenSpaceCameraController) {
+            scene.screenSpaceCameraController.enableInputs = window.__simplexInputLocks === 0;
         }
+    }
+
+    _getViewer() {
+        if (!this.tilesetViewer && typeof window !== 'undefined') {
+            this.tilesetViewer = window.tilesetViewer;
+        }
+        return this.tilesetViewer?.viewer || null;
+    }
+
+    init() {
+        this.tilesetViewer = typeof window !== 'undefined' ? window.tilesetViewer : null;
+        if (typeof document !== 'undefined') {
+            this.createStreetViewModal();
+            this.createStreetViewHud();
+            this.setupEventHandlers();
+        }
+    }
+
+    createStreetViewModal() {
+        const existing = document.getElementById('streetViewModal');
+        if (existing) existing.remove();
 
         const modal = document.createElement('div');
         modal.id = 'streetViewModal';
         modal.className = 'street-view-modal map-tool-panel-overlay';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'streetViewModalTitle');
         modal.style.display = 'none';
 
         modal.innerHTML = `
-            <div class="street-view-content">
-                <div class="street-view-header">
-                    <h2>Street View</h2>
-                    <button class="close-btn" id="closeStreetViewBtn">×</button>
+            <div class="street-view-content sdm-tool-dialog">
+                <div class="street-view-header sdm-tool-header">
+                    <h2 id="streetViewModalTitle">
+                        <i class="fas fa-street-view" aria-hidden="true"></i>
+                        <span>3D Street View</span>
+                    </h2>
+                    <button type="button" class="close-btn" id="closeStreetViewBtn" aria-label="Close Street View">×</button>
                 </div>
-                <div class="street-view-body">
-                    <div class="street-view-icon-container">
-                        <div class="street-view-icon">🚶</div>
-                    </div>
-                    
-                    <div class="street-view-instructions">
-                        <p><strong>Offline Mode:</strong> This application runs entirely offline.</p>
-                        <p>Street-level photo panoramas are not available in offline mode.</p>
-                        <p>You can still view coordinates and location information from the 3D viewer.</p>
-                    </div>
+                <div class="street-view-body sdm-tool-body">
+                    <p class="sdm-tool-lead">
+                        Explore your 3D Tiles reality model and terrain from pedestrian eye level. Drag to look 360°, use <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to walk, <kbd>Shift</kbd> to sprint, and <kbd>Esc</kbd> to return to orbit view.
+                    </p>
 
                     <div class="street-view-controls">
-                        <button class="btn btn-primary" id="useCurrentPositionBtn">
-                            <span>📍</span> Use Current Camera Position
+                        <button type="button" class="btn btn-primary btn-sm" id="selectLocationBtn">
+                            <i class="fas fa-map-marker-alt" aria-hidden="true"></i>
+                            <span>Pick Street Point</span>
                         </button>
-                        <button class="btn" id="selectLocationBtn">
-                            <span>🗺️</span> Select Location on Map
+                        <button type="button" class="btn btn-secondary btn-sm" id="useCurrentPositionBtn">
+                            <i class="fas fa-location-arrow" aria-hidden="true"></i>
+                            <span>Drop Below Camera</span>
                         </button>
                     </div>
 
-                    <div class="street-view-panel-container">
-                        <div id="streetViewPanel" class="street-view-panel">
-                            <div class="street-view-placeholder">
-                                <div class="placeholder-icon">🗺️</div>
-                                <p>Street View will appear here</p>
-                                <p class="placeholder-hint">Select a location to view</p>
-                            </div>
-                        </div>
+                    <div class="oblique-sliders-grid">
+                        <label class="oblique-slider-field" for="streetViewEyeHeight">
+                            <span>Eye Height: <strong id="streetViewEyeVal">1.7 m</strong></span>
+                            <input type="range" id="streetViewEyeHeight" min="1.2" max="15" step="0.1" value="1.7">
+                        </label>
+                        <label class="oblique-slider-field" for="streetViewFov">
+                            <span>Field of View: <strong id="streetViewFovVal">75°</strong></span>
+                            <input type="range" id="streetViewFov" min="45" max="110" step="1" value="75">
+                        </label>
                     </div>
 
                     <div class="street-view-info">
                         <div class="info-item">
-                            <span class="info-label">Location:</span>
-                            <span class="info-value" id="streetViewLocation">--</span>
+                            <span class="info-label">Location</span>
+                            <span class="info-value" id="streetViewLocation">—</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Status:</span>
-                            <span class="info-value" id="streetViewStatus">Ready</span>
+                            <span class="info-label">Status</span>
+                            <span class="info-value" id="streetViewStatus">Ready (100% offline 3D)</span>
                         </div>
                     </div>
                 </div>
@@ -122,412 +153,483 @@ class StreetViewManager {
         this.modal = modal;
     }
 
-    /**
-     * Setup event handlers
-     */
-    setupEventHandlers() {
-        this.modal?.querySelector('#closeStreetViewBtn')?.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.hide();
-        });
+    createStreetViewHud() {
+        const existing = document.getElementById('streetViewHud');
+        if (existing) existing.remove();
 
-        // Use current position
-        document.getElementById('useCurrentPositionBtn')?.addEventListener('click', () => {
-            this.useCurrentCameraPosition();
-        });
+        const hud = document.createElement('div');
+        hud.id = 'streetViewHud';
+        hud.className = 'street-view-hud';
+        hud.setAttribute('role', 'region');
+        hud.setAttribute('aria-label', 'Active Street View controls');
+        hud.style.display = 'none';
 
-        // Select location
-        document.getElementById('selectLocationBtn')?.addEventListener('click', () => {
-            this.startLocationSelection();
-        });
-
-        if (!this._escapeListener) {
-            this._escapeListener = (e) => {
-                if (e.code !== 'Escape') return;
-                if (!this.modal || window.getComputedStyle(this.modal).display === 'none') return;
-                e.preventDefault();
-                this.hide();
-            };
-            document.addEventListener('keydown', this._escapeListener, { passive: false });
-        }
-    }
-
-    /**
-     * Show Street View modal
-     */
-    show() {
-        if (this.modal) {
-            this.modal.style.display = 'flex';
-        }
-    }
-
-    /**
-     * Hide Street View modal
-     */
-    hide() {
-        if (this.modal) {
-            this.modal.style.display = 'none';
-        }
-        this.stopLocationSelection();
-        this.deactivateStreetViewLook();
-    }
-
-    /**
-     * Toggle Street View modal
-     */
-    toggle() {
-        if (this.modal && this.modal.style.display === 'none') {
-            this.show();
-        } else {
-            this.hide();
-        }
-    }
-
-    /**
-     * Use current camera position
-     */
-    useCurrentCameraPosition() {
-        if (!this.tilesetViewer || !this.tilesetViewer.viewer) {
-            if (window.notification) {
-                window.notification.error(
-                    window.appI18n?.nt ? window.appI18n.nt('viewerNotReady') : 'Viewer not ready'
-                );
-            }
-            return;
-        }
-
-        const viewer = this.tilesetViewer.viewer;
-        const camera = viewer.camera;
-
-        // Get center of screen
-        const center = new Cesium.Cartesian2(
-            viewer.canvas.clientWidth / 2,
-            viewer.canvas.clientHeight / 2
-        );
-
-        // Pick point from scene
-        const pickedObject = viewer.scene.pick(center);
-        let cartesian = null;
-
-        if (Cesium.defined(pickedObject) && pickedObject.id && pickedObject.id.position) {
-            cartesian = pickedObject.id.position.getValue();
-        } else {
-            cartesian = viewer.camera.pickEllipsoid(center, viewer.scene.globe.ellipsoid);
-        }
-
-        if (cartesian) {
-            const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
-            const lat = Cesium.Math.toDegrees(cartographic.latitude);
-            const lon = Cesium.Math.toDegrees(cartographic.longitude);
-            
-            this.loadStreetView(lat, lon);
-        } else {
-            if (window.notification) {
-                window.notification.warning(
-                    window.appI18n?.nt
-                        ? window.appI18n.nt('streetLocationUnknown')
-                        : 'Could not determine location. Please select a location on the map.'
-                );
-            }
-        }
-    }
-
-    /**
-     * Start location selection
-     */
-    startLocationSelection() {
-        if (!this.tilesetViewer || !this.tilesetViewer.viewer) {
-            if (window.notification) {
-                window.notification.error(
-                    window.appI18n?.nt ? window.appI18n.nt('viewerNotReady') : 'Viewer not ready'
-                );
-            }
-            return;
-        }
-
-        this.stopLocationSelection();
-        this.isSelecting = true;
-        const viewer = this.tilesetViewer.viewer;
-        viewer.canvas.style.cursor = 'crosshair';
-
-        // Setup click handler
-        this.selectionHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-        this.selectionHandler.setInputAction((click) => {
-            this.handleLocationClick(click);
-        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-
-        if (window.notification) {
-            window.notification.info(
-                window.appI18n?.nt ? window.appI18n.nt('streetClickMap') : 'Click on the map to select a location for Street View'
-            );
-        }
-    }
-
-    /**
-     * Handle location click
-     */
-    handleLocationClick(click) {
-        if (!this.isSelecting || !this.tilesetViewer || !this.tilesetViewer.viewer) return;
-
-        const viewer = this.tilesetViewer.viewer;
-        
-        // Try picking from scene first
-        const pickedObject = viewer.scene.pick(click.position);
-        let cartesian = null;
-
-        if (Cesium.defined(pickedObject) && pickedObject.id && pickedObject.id.position) {
-            cartesian = pickedObject.id.position.getValue();
-        } else {
-            cartesian = viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
-        }
-
-        if (cartesian) {
-            const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
-            const lat = Cesium.Math.toDegrees(cartographic.latitude);
-            const lon = Cesium.Math.toDegrees(cartographic.longitude);
-            
-            this.loadStreetView(lat, lon);
-            this.stopLocationSelection();
-        }
-    }
-
-    /**
-     * Stop location selection
-     */
-    stopLocationSelection() {
-        this.isSelecting = false;
-
-        if (this.selectionHandler) {
-            this.selectionHandler.destroy();
-            this.selectionHandler = null;
-        }
-
-        const viewer = this.tilesetViewer?.viewer;
-        if (viewer) {
-            viewer.canvas.style.cursor = 'default';
-        }
-    }
-
-    /**
-     * Load Street View for given coordinates
-     * Offline mode: Display location information only
-     */
-    loadStreetView(lat, lon) {
-        this.currentPosition = { lat, lon };
-
-        // Update status
-        document.getElementById('streetViewStatus').textContent = 'Offline Mode';
-        document.getElementById('streetViewLocation').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
-
-        // In offline mode, show location information instead of Street View
-        this.displayLocationInfo(lat, lon);
-
-        // Activate ground-locked look-around mode in the Cesium viewer
-        this.activateStreetViewLook();
-    }
-
-    /**
-     * Display location information (offline mode)
-     */
-    displayLocationInfo(lat, lon) {
-        const panel = document.getElementById('streetViewPanel');
-        if (!panel) return;
-
-        // Display location information instead of Street View
-        panel.innerHTML = `
-            <div class="street-view-placeholder">
-                <div class="placeholder-icon">📍</div>
-                <h3>Location Information</h3>
-                <div style="margin-top: 20px; text-align: left; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px;">
-                    <p><strong>Latitude:</strong> ${lat.toFixed(6)}°</p>
-                    <p><strong>Longitude:</strong> ${lon.toFixed(6)}°</p>
-                    <p style="margin-top: 15px; font-size: calc(0.9em * var(--ui-fs-mul, 1)); opacity: 0.8;">
-                        Street-level photo panoramas require an online imagery provider.
-                        This application runs entirely offline for local use.
-                    </p>
-                </div>
+        hud.innerHTML = `
+            <div class="sv-hud-badge">
+                <i class="fas fa-street-view" aria-hidden="true"></i>
+                <span>Street View</span>
+            </div>
+            <div class="sv-hud-telemetry" id="svHudTelemetry" aria-live="polite">0° N · Eye 1.7 m</div>
+            <div class="sv-hud-controls" role="group" aria-label="Walk and look controls">
+                <button type="button" class="btn btn-xs" data-sv-act="turnLeft" title="Turn left 30°" aria-label="Turn left">
+                    <i class="fas fa-undo" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="btn btn-xs" data-sv-act="forward" title="Step forward 5 m" aria-label="Step forward">
+                    <i class="fas fa-arrow-up" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="btn btn-xs" data-sv-act="backward" title="Step back 5 m" aria-label="Step backward">
+                    <i class="fas fa-arrow-down" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="btn btn-xs" data-sv-act="turnRight" title="Turn right 30°" aria-label="Turn right">
+                    <i class="fas fa-redo" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="btn btn-xs" data-sv-act="settings" title="Adjust eye height &amp; FOV" aria-label="Street View settings">
+                    <i class="fas fa-sliders-h" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="btn btn-xs btn-danger" id="exitStreetViewHudBtn" title="Exit Street View (Esc)">
+                    <i class="fas fa-sign-out-alt" aria-hidden="true"></i> Exit
+                </button>
             </div>
         `;
 
-        document.getElementById('streetViewStatus').textContent = 'Location Displayed';
-        this.isActive = true;
+        document.body.appendChild(hud);
+        this.hud = hud;
     }
 
-    /**
-     * Activate ground-locked "street view" camera mode (offline look-around)
-     * - locks camera destination near ground + eye height
-     * - disables default camera controller inputs
-     * - updates heading/pitch via mouse move (no flyTo)
-     */
-    activateStreetViewLook() {
-        if (!this.tilesetViewer || !this.tilesetViewer.viewer) return;
+    setupEventHandlers() {
+        this.modal?.querySelector('#closeStreetViewBtn')?.addEventListener('click', () => this.hideModal());
+        this.modal?.addEventListener('click', (e) => {
+            if (e.target === this.modal) this.hideModal();
+        });
 
-        const viewer = this.tilesetViewer.viewer;
-        const scene = viewer.scene;
-        const camera = viewer.camera;
+        this.modal?.querySelector('#selectLocationBtn')?.addEventListener('click', () => {
+            this.startLocationPick();
+        });
+        this.modal?.querySelector('#useCurrentPositionBtn')?.addEventListener('click', () => {
+            this.enterAtCurrentCamera();
+        });
 
-        // Disable standard inputs (prevent drift) with shared lock
-        this.lockViewerInputs();
-
-        const carto = this.currentPosition
-            ? Cesium.Cartographic.fromDegrees(this.currentPosition.lon, this.currentPosition.lat, 0)
-            : Cesium.Cartographic.fromCartesian(camera.position);
-        const initialHeading = camera.heading;
-        this._heading = initialHeading;
-        this._pitch = 0;
-
-        const applyLock = (groundHeight) => {
-            const eyeHeight = (groundHeight ?? 0) + 1.7;
-            this._lockedDestination = Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, eyeHeight);
-            camera.setView({
-                destination: this._lockedDestination,
-                orientation: {
-                    heading: this._heading,
-                    pitch: this._pitch,
-                    roll: 0
-                }
-            });
-            scene.requestRender();
-        };
-
-        if (typeof scene.sampleHeightMostDetailed === 'function') {
-            scene.sampleHeightMostDetailed([carto]).then((samples) => {
-                const s = Array.isArray(samples) ? samples[0] : carto;
-                const groundHeight = (s && typeof s.height === 'number') ? s.height : 0;
-                applyLock(groundHeight);
-            }).catch(() => {
-                applyLock(0);
-            });
-        } else {
-            applyLock(0);
-        }
-
-        // Install look handler
-        if (this._lookHandler) {
-            this._lookHandler.destroy();
-            this._lookHandler = null;
-        }
-
-        this._lookHandler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
-        this._isLookEnabled = true;
-        this._lookLast = null;
-
-        this._lookHandler.setInputAction((movement) => {
-            if (!this._isLookEnabled) return;
-            if (!this._lockedDestination) return;
-
-            const current = movement.endPosition;
-            if (!this._lookLast) {
-                this._lookLast = new Cesium.Cartesian2(current.x, current.y);
-                return;
-            }
-
-            const deltaX = current.x - this._lookLast.x;
-            const deltaY = current.y - this._lookLast.y;
-            this._lookLast = new Cesium.Cartesian2(current.x, current.y);
-
-            this._heading += deltaX * this._sensitivity;
-            this._pitch = Cesium.Math.clamp(
-                this._pitch + deltaY * this._sensitivity,
-                Cesium.Math.toRadians(-85),
-                Cesium.Math.toRadians(85)
-            );
-
-            camera.setView({
-                destination: this._lockedDestination,
-                orientation: {
-                    heading: this._heading,
-                    pitch: this._pitch,
-                    roll: 0
-                }
-            });
-            scene.requestRender();
-        }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-
-        if (window.notification) {
-            window.notification.info(
-                window.appI18n?.nt ? window.appI18n.nt('streetLookAround') : 'Street View look-around enabled (mouse move)'
-            );
-        }
-    }
-
-    /**
-     * Deactivate ground-locked look-around mode and restore default controls
-     */
-    deactivateStreetViewLook() {
-        const viewer = this.tilesetViewer?.viewer;
-        const scene = viewer?.scene;
-
-        this._isLookEnabled = false;
-        this._lockedDestination = null;
-        this._lookLast = null;
-
-        if (this._lookHandler) {
-            this._lookHandler.destroy();
-            this._lookHandler = null;
-        }
-
-        if (scene?.screenSpaceCameraController) {
-            this.unlockViewerInputs();
-            scene.requestRender();
-        }
-    }
-
-    /**
-     * Sync Street View position with 3D viewer
-     */
-    syncWithViewer(lat, lon) {
-        if (!this.tilesetViewer || !this.tilesetViewer.viewer) return;
-
-        const viewer = this.tilesetViewer.viewer;
-        const destination = Cesium.Cartesian3.fromDegrees(lon, lat, 100); // 100m altitude
-
-        // Use setView to avoid flight jitter in look-around mode
-        viewer.camera.setView({
-            destination: destination,
-            orientation: {
-                heading: viewer.camera.heading,
-                pitch: viewer.camera.pitch,
-                roll: 0
+        const eyeInput = this.modal?.querySelector('#streetViewEyeHeight');
+        const eyeVal = this.modal?.querySelector('#streetViewEyeVal');
+        eyeInput?.addEventListener('input', () => {
+            this.eyeHeight = Number(eyeInput.value) || 1.7;
+            if (eyeVal) eyeVal.textContent = `${this.eyeHeight.toFixed(1)} m`;
+            if (this.isActive && this.currentPosition) {
+                this.currentPosition.eyeOffset = this.eyeHeight;
+                this._applyCameraPose();
             }
         });
-        viewer.scene.requestRender();
+
+        const fovInput = this.modal?.querySelector('#streetViewFov');
+        const fovVal = this.modal?.querySelector('#streetViewFovVal');
+        fovInput?.addEventListener('input', () => {
+            this.fovDeg = Number(fovInput.value) || 75;
+            if (fovVal) fovVal.textContent = `${this.fovDeg}°`;
+            if (this.isActive) {
+                this._applyFov(this.fovDeg);
+            }
+        });
+
+        this.hud?.querySelector('#exitStreetViewHudBtn')?.addEventListener('click', () => this.exitStreetView());
+        this.hud?.querySelectorAll('[data-sv-act]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const act = btn.getAttribute('data-sv-act');
+                if (act === 'forward') this.stepHorizontal(5, 0);
+                else if (act === 'backward') this.stepHorizontal(-5, 0);
+                else if (act === 'turnLeft') {
+                    this._heading -= Math.PI / 6;
+                    this._applyCameraPose();
+                } else if (act === 'turnRight') {
+                    this._heading += Math.PI / 6;
+                    this._applyCameraPose();
+                } else if (act === 'settings') {
+                    if (this.modal) this.modal.style.display = 'flex';
+                }
+            });
+        });
+
+        this._keydownHandler = (e) => {
+            if (e.key === 'Escape') {
+                if (this.isSelectingLocation) {
+                    e.preventDefault();
+                    this._stopLocationPick();
+                    this.show();
+                    return;
+                }
+                if (this.modal && this.modal.style.display !== 'none') {
+                    e.preventDefault();
+                    this.hideModal();
+                    return;
+                }
+                if (this.isActive) {
+                    e.preventDefault();
+                    this.exitStreetView();
+                    return;
+                }
+            }
+
+            if (!this.isActive) return;
+            const tag = (e.target?.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) {
+                return;
+            }
+            const handled = new Set([
+                'KeyW', 'KeyA', 'KeyS', 'KeyD',
+                'KeyQ', 'KeyE',
+                'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+                'ShiftLeft', 'ShiftRight',
+            ]);
+            if (handled.has(e.code)) {
+                e.preventDefault();
+                this._keys.add(e.code);
+                this._startWalkLoop();
+            }
+        };
+
+        this._keyupHandler = (e) => {
+            this._keys.delete(e.code);
+        };
+
+        document.addEventListener('keydown', this._keydownHandler);
+        document.addEventListener('keyup', this._keyupHandler);
     }
 
-    /**
-     * Show placeholder
-     */
-    showPlaceholder(message) {
-        const panel = document.getElementById('streetViewPanel');
-        if (panel) {
-            panel.innerHTML = `
-                <div class="street-view-placeholder">
-                    <div class="placeholder-icon">🗺️</div>
-                    <p>${message || 'Street View not available'}</p>
-                    <p class="placeholder-hint">Please select a different location</p>
-                </div>
-            `;
+    show() {
+        if (!this.modal) this.createStreetViewModal();
+        this.modal.style.display = 'flex';
+        document.getElementById('streetview')?.setAttribute('aria-pressed', 'true');
+    }
+
+    hideModal() {
+        if (this.modal) this.modal.style.display = 'none';
+        if (!this.isActive) {
+            document.getElementById('streetview')?.setAttribute('aria-pressed', 'false');
         }
-        document.getElementById('streetViewStatus').textContent = 'Not Available';
+    }
+
+    hide() {
+        this._stopLocationPick();
+        this.exitStreetView(true);
+        this.hideModal();
+    }
+
+    toggle() {
+        if (this.isActive) {
+            this.exitStreetView();
+        } else if (this.modal && this.modal.style.display !== 'none') {
+            this.hideModal();
+        } else {
+            this.show();
+        }
+    }
+
+    startLocationPick() {
+        const viewer = this._getViewer();
+        if (!viewer || typeof Cesium === 'undefined') {
+            window.notification?.error?.('3D viewer is not ready');
+            return;
+        }
+        this._stopLocationPick();
+        this.isSelectingLocation = true;
+        this.hideModal();
+        viewer.canvas.style.cursor = 'crosshair';
+        window.notification?.info?.('Click any street or plaza point to enter 3D Street View (Esc to cancel)');
+
+        this._pickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+        this._pickHandler.setInputAction((click) => {
+            let cartesian = null;
+            if (viewer.scene.pickPositionSupported) {
+                try {
+                    cartesian = viewer.scene.pickPosition(click.position);
+                } catch (_) {
+                    cartesian = null;
+                }
+            }
+            if (!cartesian) {
+                cartesian = viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
+            }
+            this._stopLocationPick();
+            if (!cartesian) {
+                window.notification?.warning?.('Could not resolve surface position — try clicking closer to terrain');
+                return;
+            }
+            const carto = Cesium.Cartographic.fromCartesian(cartesian);
+            this.enterAt(
+                Cesium.Math.toDegrees(carto.longitude),
+                Cesium.Math.toDegrees(carto.latitude),
+                Math.max(-450, carto.height || 0),
+                viewer.camera.heading
+            );
+        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    }
+
+    _stopLocationPick() {
+        this.isSelectingLocation = false;
+        if (this._pickHandler) {
+            try {
+                this._pickHandler.destroy();
+            } catch (_) {
+                /* ignore */
+            }
+            this._pickHandler = null;
+        }
+        const viewer = this._getViewer();
+        if (viewer?.canvas) viewer.canvas.style.cursor = '';
+    }
+
+    enterAtCurrentCamera() {
+        const viewer = this._getViewer();
+        if (!viewer || typeof Cesium === 'undefined') {
+            window.notification?.error?.('3D viewer is not ready');
+            return false;
+        }
+        const carto = viewer.camera.positionCartographic;
+        const lon = Cesium.Math.toDegrees(carto.longitude);
+        const lat = Cesium.Math.toDegrees(carto.latitude);
+        let groundH = 0;
+        try {
+            const sampled = viewer.scene.globe.getHeight(new Cesium.Cartographic(carto.longitude, carto.latitude));
+            if (Number.isFinite(sampled)) groundH = sampled;
+        } catch (_) {
+            groundH = 0;
+        }
+        return this.enterAt(lon, lat, groundH, viewer.camera.heading);
+    }
+
+    enterAt(lon, lat, groundHeight = 0, headingRad = 0) {
+        const viewer = this._getViewer();
+        if (!viewer || typeof Cesium === 'undefined') return false;
+
+        if (!this.isActive) {
+            this._savedCamera = {
+                position: Cesium.Cartesian3.clone(viewer.camera.position, new Cesium.Cartesian3()),
+                heading: viewer.camera.heading,
+                pitch: viewer.camera.pitch,
+                roll: viewer.camera.roll,
+                fov: viewer.camera.frustum?.fov,
+            };
+        }
+
+        this.isActive = true;
+        this.currentPosition = {
+            lon: Number(lon),
+            lat: Number(lat),
+            groundHeight: Number.isFinite(groundHeight) ? groundHeight : 0,
+            eyeOffset: this.eyeHeight,
+        };
+        this._heading = Number.isFinite(headingRad) ? headingRad : 0;
+        this._pitch = Cesium.Math.toRadians(-2);
+
+        this.hideModal();
+        this.lockViewerInputs();
+        this._applyFov(this.fovDeg);
+        this._applyCameraPose();
+        this._bindLookDrag(viewer);
+
+        if (this.hud) this.hud.style.display = 'flex';
+        document.getElementById('streetview')?.classList.add('active');
+        document.getElementById('streetview')?.setAttribute('aria-pressed', 'true');
+
+        const statusEl = document.getElementById('streetViewStatus');
+        if (statusEl) statusEl.textContent = 'Active — First-Person 3D';
+        return true;
+    }
+
+    _applyFov(deg) {
+        const viewer = this._getViewer();
+        if (!viewer?.camera?.frustum || typeof Cesium === 'undefined') return;
+        if ('fov' in viewer.camera.frustum) {
+            viewer.camera.frustum.fov = Cesium.Math.toRadians(Math.max(45, Math.min(110, deg)));
+            viewer.scene?.requestRender?.();
+        }
+    }
+
+    _applyCameraPose() {
+        const viewer = this._getViewer();
+        const pos = this.currentPosition;
+        if (!viewer || !pos || typeof Cesium === 'undefined') return;
+
+        const maxPitch = Cesium.Math.toRadians(82);
+        this._pitch = Math.max(-maxPitch, Math.min(maxPitch, this._pitch));
+        this._heading = ((this._heading % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+
+        const totalH = (pos.groundHeight || 0) + (pos.eyeOffset || this.eyeHeight);
+        viewer.camera.setView({
+            destination: Cesium.Cartesian3.fromDegrees(pos.lon, pos.lat, totalH),
+            orientation: {
+                heading: this._heading,
+                pitch: this._pitch,
+                roll: 0,
+            },
+        });
+        viewer.scene?.requestRender?.();
+
+        const hdgDeg = Math.round(Cesium.Math.toDegrees(this._heading)) % 360;
+        const card = StreetViewManager.formatCardinal(hdgDeg);
+        const locStr = `${pos.lat.toFixed(6)}°, ${pos.lon.toFixed(6)}° (${totalH.toFixed(1)} m)`;
+        const locEl = document.getElementById('streetViewLocation');
+        if (locEl) locEl.textContent = locStr;
+        const hudTel = document.getElementById('svHudTelemetry');
+        if (hudTel) {
+            hudTel.textContent = `${hdgDeg}° ${card} · ${pos.lat.toFixed(5)}°, ${pos.lon.toFixed(5)}° · Eye ${this.eyeHeight.toFixed(1)} m`;
+        }
     }
 
     /**
-     * Get current Street View position
+     * Advance pedestrian coordinates by `forwardMeters` and `rightMeters` along current heading.
      */
-    getCurrentPosition() {
-        return this.currentPosition;
+    stepHorizontal(forwardMeters = 0, rightMeters = 0) {
+        const pos = this.currentPosition;
+        if (!pos) return;
+        const sinH = Math.sin(this._heading);
+        const cosH = Math.cos(this._heading);
+        const eastM = forwardMeters * sinH + rightMeters * cosH;
+        const northM = forwardMeters * cosH - rightMeters * sinH;
+
+        const metersPerDegLat = 111320;
+        const cosLat = Math.max(0.01, Math.cos((pos.lat * Math.PI) / 180));
+        const metersPerDegLon = metersPerDegLat * cosLat;
+
+        pos.lat = Math.max(-89.9, Math.min(89.9, pos.lat + northM / metersPerDegLat));
+        pos.lon = ((pos.lon + eastM / metersPerDegLon + 540) % 360) - 180;
+        this._applyCameraPose();
     }
 
-    /**
-     * Check if Street View is active
-     */
-    isStreetViewActive() {
-        return this.isActive;
+    _startWalkLoop() {
+        if (this._rafId || typeof requestAnimationFrame === 'undefined') return;
+        this._lastStepMs = performance.now();
+        const tick = (now) => {
+            if (!this.isActive || this._keys.size === 0) {
+                this._rafId = null;
+                return;
+            }
+            const dt = Math.min(0.1, Math.max(0.001, (now - this._lastStepMs) / 1000));
+            this._lastStepMs = now;
+            const boost = this._keys.has('ShiftLeft') || this._keys.has('ShiftRight') ? 3.0 : 1.0;
+            const speed = this.walkSpeed * boost * dt;
+
+            let fwd = 0;
+            let right = 0;
+            if (this._keys.has('KeyW') || this._keys.has('ArrowUp')) fwd += speed;
+            if (this._keys.has('KeyS') || this._keys.has('ArrowDown')) fwd -= speed;
+            if (this._keys.has('KeyD')) right += speed;
+            if (this._keys.has('KeyA')) right -= speed;
+            if (this._keys.has('KeyQ') || this._keys.has('ArrowLeft')) this._heading -= 1.5 * dt;
+            if (this._keys.has('KeyE') || this._keys.has('ArrowRight')) this._heading += 1.5 * dt;
+
+            if (fwd !== 0 || right !== 0) {
+                this.stepHorizontal(fwd, right);
+            } else {
+                this._applyCameraPose();
+            }
+            this._rafId = requestAnimationFrame(tick);
+        };
+        this._rafId = requestAnimationFrame(tick);
+    }
+
+    _bindLookDrag(viewer) {
+        this._unbindLookDrag();
+        if (typeof Cesium === 'undefined') return;
+        viewer.canvas.style.cursor = 'grab';
+        const h = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+        h.setInputAction((down) => {
+            this._isDraggingLook = true;
+            this._lookLast = { x: down.position.x, y: down.position.y };
+            viewer.canvas.style.cursor = 'grabbing';
+        }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
+
+        h.setInputAction((move) => {
+            if (!this._isDraggingLook || !this._lookLast) return;
+            const dx = move.endPosition.x - this._lookLast.x;
+            const dy = move.endPosition.y - this._lookLast.y;
+            this._lookLast = { x: move.endPosition.x, y: move.endPosition.y };
+            this._heading -= dx * this._sensitivity;
+            this._pitch += dy * this._sensitivity;
+            this._applyCameraPose();
+        }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+        h.setInputAction(() => {
+            this._isDraggingLook = false;
+            this._lookLast = null;
+            if (viewer?.canvas) viewer.canvas.style.cursor = 'grab';
+        }, Cesium.ScreenSpaceEventType.LEFT_UP);
+
+        this._lookHandler = h;
+    }
+
+    _unbindLookDrag() {
+        if (this._lookHandler) {
+            try {
+                this._lookHandler.destroy();
+            } catch (_) {
+                /* ignore */
+            }
+            this._lookHandler = null;
+        }
+        this._isDraggingLook = false;
+        this._lookLast = null;
+        const viewer = this._getViewer();
+        if (viewer?.canvas) viewer.canvas.style.cursor = '';
+    }
+
+    exitStreetView(silent = false) {
+        if (!this.isActive) return;
+        this.isActive = false;
+        this._keys.clear();
+        if (this._rafId && typeof cancelAnimationFrame !== 'undefined') {
+            cancelAnimationFrame(this._rafId);
+            this._rafId = null;
+        }
+        this._unbindLookDrag();
+        this.unlockViewerInputs();
+
+        const viewer = this._getViewer();
+        if (viewer && this._savedCamera && typeof Cesium !== 'undefined') {
+            try {
+                if (Number.isFinite(this._savedCamera.fov) && viewer.camera.frustum && 'fov' in viewer.camera.frustum) {
+                    viewer.camera.frustum.fov = this._savedCamera.fov;
+                }
+                viewer.camera.setView({
+                    destination: this._savedCamera.position,
+                    orientation: {
+                        heading: this._savedCamera.heading,
+                        pitch: this._savedCamera.pitch,
+                        roll: this._savedCamera.roll,
+                    },
+                });
+                viewer.scene?.requestRender?.();
+            } catch (_) {
+                /* ignore */
+            }
+        }
+        this._savedCamera = null;
+
+        if (this.hud) this.hud.style.display = 'none';
+        const btn = typeof document !== 'undefined' ? document.getElementById('streetview') : null;
+        btn?.classList.remove('active');
+        btn?.setAttribute('aria-pressed', 'false');
+
+        const statusEl = typeof document !== 'undefined' ? document.getElementById('streetViewStatus') : null;
+        if (statusEl) statusEl.textContent = 'Ready (100% offline 3D)';
+        if (!silent) {
+            window.notification?.info?.('Exited Street View');
+        }
+    }
+
+    cleanup() {
+        this._stopLocationPick();
+        this.exitStreetView(true);
+        if (typeof document !== 'undefined') {
+            if (this._keydownHandler) document.removeEventListener('keydown', this._keydownHandler);
+            if (this._keyupHandler) document.removeEventListener('keyup', this._keyupHandler);
+        }
     }
 }
 
-// Initialize when available
 if (typeof window !== 'undefined') {
+    window.StreetViewManager = StreetViewManager;
     window.streetViewManager = new StreetViewManager();
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { StreetViewManager };
 }

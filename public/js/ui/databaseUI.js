@@ -33,6 +33,21 @@ class DatabaseUI {
         }
     }
 
+    show() {
+        const modal = document.getElementById('databaseModal');
+        if (modal) {
+            modal.style.display = 'flex';
+        }
+        this.refresh();
+    }
+
+    hide() {
+        const modal = document.getElementById('databaseModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
     /**
      * Refresh database content
      */
@@ -68,18 +83,22 @@ class DatabaseUI {
             </div>
             <div class="tileset-list">
                 <h3>${t('storedTilesetsCount').replace(/\{count\}/g, String(tilesetsArray.length))}</h3>
-                ${tilesetsArray.map(tileset => `
+                ${tilesetsArray.map(tileset => {
+                    const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                    const displayName = esc(window.pathResolver?.getTilesetName(tileset.url) || tileset.url);
+                    return `
                     <div class="list-item">
                         <div>
-                            <strong>${window.pathResolver?.getTilesetName(tileset.url) || tileset.url}</strong>
+                            <strong>${displayName}</strong>
                             <div style="font-size: calc(11px * var(--ui-fs-mul, 1)); color: var(--text-secondary);">
-                                ${t('tiles')}: ${tileset.tileCount || 0} | 
-                                ${t('nested')}: ${tileset.nestedTilesets || 0} |
-                                ${new Date(tileset.timestamp).toLocaleDateString()}
+                                ${t('tiles')}: ${Number(tileset.tileCount) || 0} | 
+                                ${t('nested')}: ${Number(tileset.nestedTilesets) || 0} |
+                                ${tileset.timestamp ? new Date(tileset.timestamp).toLocaleDateString() : '—'}
                             </div>
                         </div>
                     </div>
-                `).join('')}
+                `;
+                }).join('')}
             </div>
         `;
 
@@ -136,13 +155,14 @@ class DatabaseUI {
                     if (url.startsWith('http://') || url.startsWith('https://')) {
                         tilesetUrl = url;
                     } else {
-                        // It's a file path - convert to server URL
-                        const rawPort = await window.electronAPI?.getServerPort();
-                        const serverPort =
-                            Number.isFinite(Number(rawPort)) && Number(rawPort) > 0
-                                ? Number(rawPort)
-                                : 8000;
-                        tilesetUrl = `http://localhost:${serverPort}/file?path=${encodeURIComponent(url)}`;
+                        // It's a file path - convert to origin-aware server URL
+                        let originBase = window.pathResolver?.baseUrl || window.location.origin;
+                        if (window.electronAPI?.isElectron === true && typeof window.electronAPI.getServerPort === 'function') {
+                            const rawPort = await window.electronAPI.getServerPort();
+                            const serverPort = Number.isFinite(Number(rawPort)) && Number(rawPort) > 0 ? Number(rawPort) : 8000;
+                            originBase = `http://localhost:${serverPort}`;
+                        }
+                        tilesetUrl = `${originBase}/file?path=${encodeURIComponent(url)}`;
                     }
 
                     const response = await fetch(tilesetUrl);
@@ -193,23 +213,39 @@ class DatabaseUI {
 
         try {
             // Prompt user to select master tileset file
-            const file = await window.fileManager.openFileDialog({
+            const selected = await window.fileManager.openFileDialog({
+                autoLoad: false,
                 filters: [
                     { name: 'Tileset JSON', extensions: ['json'] }
                 ]
             });
 
-            if (!file) {
+            if (!selected) {
                 window.notification?.info(this._t('db.noFileSelected'));
                 return;
             }
 
-            // Read and parse the master tileset
-            const content = await window.fileManager.readFile(file.path);
+            // Support string path, FileSystemFileHandle, or File object
+            let masterUrl = '';
+            let content = '';
+            if (typeof selected === 'string') {
+                masterUrl = selected;
+                content = await window.fileManager.readFile(selected);
+            } else if (typeof selected.getFile === 'function') {
+                const f = await selected.getFile();
+                masterUrl = selected.name || f.name;
+                content = await f.text();
+            } else if (typeof selected.text === 'function') {
+                masterUrl = window.electronAPI?.getPathForFile?.(selected) || selected.path || selected.name;
+                content = await selected.text();
+            } else if (selected.path) {
+                masterUrl = selected.path;
+                content = await window.fileManager.readFile(selected.path);
+            }
+
             const masterTileset = JSON.parse(content);
 
             // Store master tileset
-            const masterUrl = file.path;
             await this.tilesetDatabase.storeTileset(masterUrl, masterTileset);
 
             // Find and parse nested tilesets
@@ -218,24 +254,26 @@ class DatabaseUI {
             let failed = 0;
 
             // Parse each nested tileset
+            const masterDir = window.pathResolver?.getDirectory(masterUrl) || '';
             for (const nestedUri of nestedTilesets) {
                 try {
-                    // Resolve nested tileset path relative to master tileset directory
-                    const masterDir = window.pathResolver?.getDirectory(masterUrl) || '';
-                    const nestedPath = window.pathResolver?.resolvePath(nestedUri, masterDir) || nestedUri;
+                    const nestedPath = window.pathResolver
+                        ? await window.pathResolver.resolvePath(nestedUri, masterDir || null)
+                        : nestedUri;
 
-                    // Try to read nested tileset
                     let nestedContent;
                     try {
                         nestedContent = await window.fileManager.readFile(nestedPath);
                     } catch (e) {
-                        // Try as relative path from master
-                        const altPath = window.pathResolver?.join(masterDir, nestedUri);
+                        const altPath = window.pathResolver?.join
+                            ? window.pathResolver.join(masterDir, nestedUri)
+                            : `${masterDir}/${nestedUri}`;
                         nestedContent = await window.fileManager.readFile(altPath);
                     }
 
                     const nestedTileset = JSON.parse(nestedContent);
-                    await this.tilesetDatabase.storeTileset(nestedPath, nestedTileset);
+                    const storeKey = typeof nestedPath === 'string' ? nestedPath : nestedUri;
+                    await this.tilesetDatabase.storeTileset(storeKey, nestedTileset);
                     parsed++;
                 } catch (error) {
                     console.error(`Failed to parse nested tileset ${nestedUri}:`, error);

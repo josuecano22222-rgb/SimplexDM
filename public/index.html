@@ -9,7 +9,7 @@
     <script>
         if (window.simplexThemeSync) window.simplexThemeSync(null);
     </script>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:* http://127.0.0.1:* data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdnjs.cloudflare.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' http://localhost:* http://127.0.0.1:* data: blob:; font-src 'self' data:; connect-src 'self' http://localhost:* http://127.0.0.1:* data: blob:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:* http://127.0.0.1:* data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' http://localhost:* http://127.0.0.1:* https://tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org data: blob:; font-src 'self' data:; connect-src 'self' http://localhost:* http://127.0.0.1:* https://tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://nominatim.openstreetmap.org data: blob:;">
     <title>Meridian — Reality Planning Platform</title>
     <link rel="icon" href="assets/meridian-icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="lib/fontawesome/css/all.min.css">
@@ -41,7 +41,10 @@
             Cesium.Ion.defaultAccessToken = '';
             if (Cesium.Ion) Cesium.Ion.defaultAccessToken = '';
             window.cesiumAvailable = true;
-            window.__preferIonSdkMeasurements = true;
+            window.__preferIonSdkMeasurements = Boolean(
+                typeof IonSdkMeasurements !== 'undefined' ||
+                (Cesium && (Cesium.Measure || Cesium.IonSdkMeasurements))
+            );
         } else {
             window.cesiumAvailable = false;
             console.warn('CesiumJS failed to load');
@@ -50,6 +53,7 @@
 
 </head>
 <body class="dock-panel-ui theme-dark">
+<a href="#cesiumContainer" class="skip-link" data-i18n="ui.a11y.skipToViewport">Skip to 3D viewport</a>
 <script>
     if (window.simplexThemeSync) window.simplexThemeSync(document.body);
 </script>
@@ -140,6 +144,21 @@
                     <div class="layers-actions-grid">
                     <button type="button" class="btn btn-primary btn-block" id="openLayersMenuBtn">
                         <i class="fas fa-layer-group"></i> <span data-i18n="ui.leftSidebar.layersMenu">Layers Menu</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-block" id="quickSearchBtn" title="Search locations &amp; coordinates">
+                        <i class="fas fa-search"></i> <span data-i18n="ui.tools.search">Search</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-block" id="quickBookmarksBtn" title="Saved camera bookmarks">
+                        <i class="fas fa-bookmark"></i> <span data-i18n="ui.tools.bookmarks">Bookmarks</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-block" id="quickUploadBtn" title="Upload 3D models &amp; GIS layers">
+                        <i class="fas fa-cloud-upload-alt"></i> <span data-i18n="ui.tools.upload">Upload</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-block" id="quickCollaborateBtn" title="Collaboration, annotations &amp; presentations">
+                        <i class="fas fa-users"></i> <span data-i18n="ui.tools.collaborate">Collaborate</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-block" id="quickPerfMonitorBtn" title="Real-time 3D FPS &amp; tile cache monitor">
+                        <i class="fas fa-tachometer-alt"></i> <span data-i18n="ui.tools.performance">Performance</span>
                     </button>
                     <button type="button" class="btn btn-secondary btn-block" id="coordinateResearchBtn" data-i18n-title="ui.leftSidebar.coordinateResearchTitle">
                         <i class="fas fa-crosshairs" aria-hidden="true"></i> <span data-i18n="ui.leftSidebar.coordinateResearch">Coordinate Research</span>
@@ -433,6 +452,8 @@
                         <select id="offlineRasterSourceSelect" class="select-input inspector-style-select">
                             <option value="tiles" data-i18n="ui.rightSidebar.offlineBasemapTiles">Standard imagery (data/tiles)</option>
                             <option value="pro" data-i18n="ui.rightSidebar.offlineBasemapPro">Aerial imagery (data/pro)</option>
+                            <option value="vector" data-i18n="ui.rightSidebar.offlineBasemapVector">Vector tiles (data/tiles/vector)</option>
+                            <option value="osm" data-i18n="ui.rightSidebar.offlineBasemapOsm">OpenStreetMap (online fallback)</option>
                         </select>
                     </div>
                 </div>
@@ -449,6 +470,13 @@
                         <button type="button" class="btn btn-primary btn-icon btn-icon--tileset" id="quickLoadTilesetBtn" data-i18n-title="ui.rightSidebar.quickLoadTileset" data-i18n-aria="ui.rightSidebar.quickLoadTileset">
                             <i class="fas fa-folder-open" aria-hidden="true"></i>
                             <span class="visually-hidden" data-i18n="ui.rightSidebar.quickLoadTileset">Load tileset</span>
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-xs btn-sample-campus" id="loadSampleTilesetBtn" data-i18n-title="ui.rightSidebar.loadSampleTilesetTitle">
+                            <i class="fas fa-city" aria-hidden="true"></i>
+                            <span data-i18n="ui.rightSidebar.loadSampleTileset">Sample 3D</span>
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-xs" id="openTilesetJsonEditorBtn" data-i18n-title="ui.rightSidebar.editTilesetJsonTitle" data-i18n-aria="ui.rightSidebar.editTilesetJsonTitle">
+                            <i class="fas fa-file-code" aria-hidden="true"></i>
                         </button>
                     </div>
                     <div class="tileset-bar">
@@ -515,6 +543,18 @@
                                 <option value="selected" data-i18n="ui.rightSidebar.targetSelected">Selected Tileset</option>
                                 <option value="all" data-i18n="ui.rightSidebar.targetAll">All Tilesets</option>
                             </select>
+                        </div>
+                        <div class="transform-readout-bar">
+                            <span class="transform-offset-text" id="transformOffsetReadout" aria-live="polite">ΔE 0.0 · ΔN 0.0 · ΔU 0.0 m · Hdg 0°</span>
+                            <div class="transform-action-btns">
+                                <button type="button" class="btn btn-xs btn-secondary" id="resetTilesetTransformBtn" data-i18n-title="ui.rightSidebar.resetTransformTitle">
+                                    <i class="fas fa-undo-alt" aria-hidden="true"></i>
+                                    <span data-i18n="ui.rightSidebar.resetTransform">Reset</span>
+                                </button>
+                                <button type="button" class="btn btn-xs btn-secondary" id="exportTilesetTransformBtn" data-i18n-title="ui.rightSidebar.exportTransformTitle" data-i18n-aria="ui.rightSidebar.exportTransformTitle">
+                                    <i class="fas fa-file-export" aria-hidden="true"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -979,6 +1019,7 @@
 <!-- ══════════════════════════════════════════════════════════
      SCRIPTS — load order preserved exactly from original
 ══════════════════════════════════════════════════════════ -->
+<script src="js/core/webGisBridge.js"></script>
 <script src="js/utils/logger.js"></script>
 <script src="js/utils/errorHandler.js"></script>
 <script src="js/utils/pathResolver.js"></script>
@@ -1020,6 +1061,8 @@
 <script src="js/core/pathManager.js"></script>
 <script src="js/core/fileManager.js"></script>
 <script src="js/core/fileEditor.js"></script>
+<script src="js/core/b3dmFeatureExtractor.js"></script>
+<script src="js/core/advancedTileLoading.js"></script>
 <script src="js/core/tilesetProcessor.js"></script>
 <script src="js/core/jsonConfigManager.js"></script>
 <script src="js/core/moduleRuntimeGate.js"></script>
@@ -1029,6 +1072,7 @@
 <script src="js/ui/viewRangeToolbarInject.js"></script>
     <script src="js/ui/smart3dToolbarWireup.js"></script>
     <script src="js/ui/sceneModesParameterPanel.js"></script>
+    <script src="js/gis/offlineVectorTileProvider.js"></script>
     <script src="js/core/tilesetViewer.js"></script>
 <script src="js/ui/offlineRasterSourceUI.js"></script>
 <script src="js/features/tileInspector.js"></script>
@@ -1080,6 +1124,7 @@
 <script src="js/features/supermanFlightModeManager.js"></script>
 <script src="js/features/obliqueViewsManager.js"></script>
 <script src="js/features/modelAndLayerUploadManager.js"></script>
+<script src="js/features/collaborationManager.js"></script>
 <script src="js/features/simVisualToolsBridge.js"></script>
 <script src="js/ui/ionSdkToolsFacade.js"></script>
 <script src="js/features/simIntegrationManager.js"></script>
@@ -1196,6 +1241,11 @@
 
         initManager.addDeferred(async () => {
             await initManager.waitForViewer();
+            initMod('advancedTileLoading', () => window.advancedTileLoading?.init(window.tilesetViewer?.viewer));
+            initMod('collaborationManager', () => window.collaborationManager?.init(window.tilesetViewer));
+            if (window.navigationManager?.initBrowseToolbar) {
+                window.navigationManager.initBrowseToolbar();
+            }
             initMod('tileInspectorUI', () => window.tileInspectorUI?.init());
             initMod('bookmarkManager', () => window.bookmarkManager?.init());
             initMod('screenshotManager', () => window.screenshotManager?.init());
@@ -1321,10 +1371,37 @@
                     flightMode: () => window.supermanFlightModeManager?.show?.(),
                     obliqueViews: () => window.obliqueViewsManager?.show?.(),
                     modelUpload: () => window.modelAndLayerUploadManager?.show?.(),
+                    collaboration: () => window.collaborationManager?.toggle?.(),
+                    performanceMonitor: () => window.performanceMonitor?.toggle?.(),
+                    geoprocessing: () => window.geoprocessingUI?.show?.(),
                     mapLabels: () => window.labelManagerUI?.focusPanel?.()
                 };
                 if (a && typeof extra[a] === 'function') extra[a]();
             });
+
+            // Quick Action launchers in Left Sidebar
+            document.getElementById('quickSearchBtn')?.addEventListener('click', () => window.searchManager?.show?.());
+            document.getElementById('quickBookmarksBtn')?.addEventListener('click', () => {
+                const b = window.bookmarkManager;
+                if (b?.toggleGallery) b.toggleGallery();
+                else if (b?.showGallery) b.showGallery();
+                else b?.show?.();
+            });
+            document.getElementById('quickUploadBtn')?.addEventListener('click', () => window.modelAndLayerUploadManager?.show?.());
+            document.getElementById('quickCollaborateBtn')?.addEventListener('click', () => window.collaborationManager?.toggle?.());
+            document.getElementById('quickPerfMonitorBtn')?.addEventListener('click', () => window.performanceMonitor?.toggle?.());
+
+            // Auto-load bundled Meridian Campus 3D Tiles when launched with ?sample=1
+            try {
+                const qp = new URLSearchParams(window.location.search);
+                if (qp.get('sample') === '1') {
+                    setTimeout(() => {
+                        window.loadMeridianSampleTileset?.();
+                    }, 900);
+                }
+            } catch (_) {
+                /* ignore */
+            }
 
         }, 'event-listeners');
 

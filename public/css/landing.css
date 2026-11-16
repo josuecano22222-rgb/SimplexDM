@@ -1,11 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════
    Meridian · LANDING PAGE · Premium Dark Editorial
    Aesthetic: Precision Dark — architectural resolve, surgical clarity
-   Fonts: Syne (display) · DM Mono (data)
+   Typography: Self-contained offline geometric sans & tabular mono
    Philosophy: Deep voids, surgical cyan, generous space
    ═══════════════════════════════════════════════════════════════ */
-
-   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap');
 
    :root {
      --void:       #060810;

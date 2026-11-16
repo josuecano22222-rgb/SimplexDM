@@ -31,10 +31,25 @@ function registerLabelIpc(deps) {
       try {
         dbService.loadRegion(id);
       } catch (_) {
-        /* skip missing */
+        /* skip missing or invalid */
       }
     }
     return dbService.queryViewport(viewport, activeRegions, opts || {});
+  });
+
+  ipcMain.handle('gis.labels.search', (_evt, query, opts = {}) => {
+    const installed = importer.listInstalled();
+    const enabledRegions = Array.isArray(opts?.activeRegions)
+      ? opts.activeRegions
+      : installed.filter((r) => r && r.enabled !== false).map((r) => r.id);
+    for (const id of enabledRegions) {
+      try {
+        dbService.loadRegion(id);
+      } catch (_) {
+        /* skip missing */
+      }
+    }
+    return dbService.searchLabels(query, { ...(opts || {}), activeRegions: enabledRegions });
   });
 
   ipcMain.handle('gis.labels.listRegions', () => importer.listInstalled());

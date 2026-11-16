@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * HTTPS download helpers for label SQLite / .rlp packs (main process only).
+ * HTTPS download and SQLite schema verification helpers for label databases and `.rlp` packs.
  */
 
 const fs = require('fs');
@@ -11,29 +11,34 @@ const https = require('https');
 const http = require('http');
 const { URL } = require('url');
 
-const Database = require('better-sqlite3');
+const Database = require('./sqliteDriver');
 
 const MAX_REDIRECTS = 16;
 const DEFAULT_MAX_BYTES = 4 * 1024 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 120_000;
+
+const REQUIRED_LABEL_COLUMNS = ['id', 'name', 'type', 'priority', 'zoom_min', 'zoom_max', 'lon', 'lat'];
 
 /**
  * @param {import('electron').App} app
  * @returns {string[]}
  */
 function manifestCandidatePaths(app) {
+  const appPath = app && typeof app.getAppPath === 'function' ? app.getAppPath() : '';
   const out = [
     path.join(__dirname, '..', '..', '..', 'data', 'label-download-manifest.json'),
-    path.join(app.getAppPath(), 'data', 'label-download-manifest.json'),
-    path.join(path.dirname(app.getAppPath()), 'data', 'label-download-manifest.json'),
+    appPath ? path.join(appPath, 'data', 'label-download-manifest.json') : '',
+    appPath ? path.join(path.dirname(appPath), 'data', 'label-download-manifest.json') : '',
   ];
   if (process.resourcesPath) {
     out.push(path.join(process.resourcesPath, 'data', 'label-download-manifest.json'));
+    out.push(path.join(path.dirname(process.resourcesPath), 'data', 'label-download-manifest.json'));
   }
   return [...new Set(out.filter(Boolean))];
 }
 
 /**
+ * Normalize manifest schema so both flat (`worldBaseUrl`) and nested (`worldBase.url`) formats work.
  * @param {import('electron').App} app
  * @returns {object}
  */
@@ -41,22 +46,28 @@ function readDownloadManifest(app) {
   for (const p of manifestCandidatePaths(app)) {
     try {
       if (p && fs.existsSync(p)) {
-        const raw = fs.readFileSync(p, 'utf8');
-        return JSON.parse(raw);
+        const parsed = JSON.parse(fs.readFileSync(p, 'utf8'));
+        if (parsed && typeof parsed === 'object') {
+          const worldBaseUrl =
+            parsed.worldBaseUrl || (parsed.worldBase && typeof parsed.worldBase.url === 'string' ? parsed.worldBase.url : '');
+          const worldBaseSha256 =
+            parsed.worldBaseSha256 ||
+            (parsed.worldBase && typeof parsed.worldBase.sha256 === 'string' ? parsed.worldBase.sha256 : '');
+          return {
+            ...parsed,
+            worldBaseUrl: worldBaseUrl || '',
+            worldBaseSha256: worldBaseSha256 || '',
+            regions: Array.isArray(parsed.regions) ? parsed.regions : [],
+          };
+        }
       }
     } catch (e) {
       console.warn('[labelDownloadService] manifest read failed:', p, e.message);
     }
   }
-  return {};
+  return { worldBaseUrl: '', worldBaseSha256: '', regions: [] };
 }
 
-/**
- * @param {string} urlString
- * @param {number} redirectCount
- * @param {{ allowHttp?: boolean }} opts
- * @returns {Promise<import('http').IncomingMessage>}
- */
 function requestOnce(urlString, redirectCount, opts) {
   const { allowHttp = false } = opts;
   return new Promise((resolve, reject) => {
@@ -67,7 +78,7 @@ function requestOnce(urlString, redirectCount, opts) {
     let u;
     try {
       u = new URL(urlString);
-    } catch (e) {
+    } catch (_) {
       reject(new Error('Invalid URL'));
       return;
     }
@@ -84,7 +95,7 @@ function requestOnce(urlString, redirectCount, opts) {
       urlString,
       {
         method: 'GET',
-        headers: { 'User-Agent': 'SimplexDM/1.2 (labels)' },
+        headers: { 'User-Agent': 'SimplexDM/2.0 (labels)' },
         timeout: REQUEST_TIMEOUT_MS,
       },
       (res) => {
@@ -130,6 +141,7 @@ function sha256File(filePath) {
 }
 
 /**
+ * Verify that `filePath` is a valid SimplexDM label SQLite DB with `labels` and `labels_rtree`.
  * @param {string} filePath
  */
 function verifyLabelsSqlite(filePath) {
@@ -144,10 +156,19 @@ function verifyLabelsSqlite(filePath) {
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='labels'")
       .get();
     if (!labels) throw new Error('Database is missing required table "labels"');
+
     const rtree = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='labels_rtree'")
       .get();
     if (!rtree) throw new Error('Database is missing required R-tree "labels_rtree"');
+
+    const colRows = db.prepare('PRAGMA table_info(labels)').all();
+    const cols = new Set(colRows.map((c) => c.name));
+    for (const reqCol of REQUIRED_LABEL_COLUMNS) {
+      if (!cols.has(reqCol)) {
+        throw new Error(`Database table "labels" is missing required column "${reqCol}"`);
+      }
+    }
   } finally {
     if (db) {
       try {
@@ -162,7 +183,7 @@ function verifyLabelsSqlite(filePath) {
 /**
  * @param {string} urlString
  * @param {string} destPath
- * @param {{ onProgress?: (pct01: number, received: number, total: number) => void, maxBytes?: number, allowHttp?: boolean }} options
+ * @param {{ onProgress?: (pct01: number, received: number, total: number) => void, maxBytes?: number, allowHttp?: boolean }} [options]
  */
 async function downloadToFile(urlString, destPath, options = {}) {
   const { onProgress, maxBytes = DEFAULT_MAX_BYTES, allowHttp = false } = options;

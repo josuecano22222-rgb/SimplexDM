@@ -97,10 +97,21 @@ class RegionsManager {
             : '';
 
         const traverse = (tile, path = 'root', depth = 0) => {
-            if (tile.content && tile.content.uri) {
-                const uri = tile.content.uri;
+            if (!tile || typeof tile !== 'object') return;
+            const candidateUris = [];
+            if (tile.content) {
+                const u = tile.content.uri || tile.content.url;
+                if (typeof u === 'string') candidateUris.push(u);
+            }
+            if (Array.isArray(tile.contents)) {
+                tile.contents.forEach((c) => {
+                    const u = c?.uri || c?.url;
+                    if (typeof u === 'string') candidateUris.push(u);
+                });
+            }
 
-                if (uri.endsWith('.json')) {
+            for (const uri of candidateUris) {
+                if (uri.split('?')[0].toLowerCase().endsWith('.json')) {
                     const baseName = this.extractRegionName(uri);
                     const region = {
                         id: this.generateRegionId(),
@@ -201,6 +212,33 @@ class RegionsManager {
             }
             return true;
         });
+    }
+
+    /**
+     * Filter regions by date range and refresh UI (called by frontendIntegration).
+     */
+    filterByDateRange(startDate, endDate) {
+        const filtered = this.filterRegionsByDate(startDate, endDate);
+        if (window.regionsManagerUI) {
+            window.regionsManagerUI.filteredRegions = filtered;
+            window.regionsManagerUI.refresh?.();
+        }
+        return filtered;
+    }
+
+    /**
+     * Reset date filter and show all regions (called by frontendIntegration).
+     */
+    clearDateFilter() {
+        const startEl = document.getElementById('regionStartDate');
+        const endEl = document.getElementById('regionEndDate');
+        if (startEl) startEl.value = '';
+        if (endEl) endEl.value = '';
+        if (window.regionsManagerUI) {
+            window.regionsManagerUI.filteredRegions = this.regions;
+            window.regionsManagerUI.refresh?.();
+        }
+        return this.regions;
     }
 
     /**

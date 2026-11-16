@@ -360,11 +360,13 @@ class SplitScreenManager {
                 Cesium.Ion.defaultAccessToken = '';
             }
 
-            // Get base URL for tile loading
-            const raw = await window.electronAPI?.getServerPort();
-            const serverPort =
-                Number.isFinite(Number(raw)) && Number(raw) > 0 ? Number(raw) : 8000;
-            const baseUrl = `http://localhost:${serverPort}`;
+            // Resolve origin-aware base URL for offline/local tile loading (works in Electron & reverse-proxy web mode)
+            let baseUrl = window.pathResolver?.baseUrl || window.location.origin;
+            if (window.electronAPI?.isElectron === true && typeof window.electronAPI.getServerPort === 'function') {
+                const raw = await window.electronAPI.getServerPort();
+                const serverPort = Number.isFinite(Number(raw)) && Number(raw) > 0 ? Number(raw) : 8000;
+                baseUrl = `http://localhost:${serverPort}`;
+            }
 
             // Create new Cesium viewer
             const viewer = new Cesium.Viewer(container, {

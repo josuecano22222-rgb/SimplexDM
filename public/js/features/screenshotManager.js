@@ -73,6 +73,14 @@ class ScreenshotManager {
                                 <option value="4">Ultra High (4x)</option>
                             </select>
                         </div>
+                        <div class="screenshot-option-group">
+                            <label>Format:</label>
+                            <select id="screenshotFormat" class="select-input">
+                                <option value="png" selected>PNG (Lossless)</option>
+                                <option value="jpeg">JPEG (Compact)</option>
+                                <option value="webp">WebP (Modern)</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="screenshot-actions">
                         <button class="btn btn-primary" id="captureScreenshotBtn">
@@ -82,6 +90,10 @@ class ScreenshotManager {
                         <button class="btn" id="downloadScreenshotBtn" style="display: none;">
                             <span class="btn-icon">💾</span>
                             Download
+                        </button>
+                        <button class="btn" id="exportScreenshotReportBtn" style="display: none;">
+                            <span class="btn-icon">📄</span>
+                            Export Report
                         </button>
                     </div>
                 </div>
@@ -111,6 +123,11 @@ class ScreenshotManager {
         // Download button
         document.getElementById('downloadScreenshotBtn')?.addEventListener('click', () => {
             this.downloadScreenshot();
+        });
+
+        // Export HTML report button
+        document.getElementById('exportScreenshotReportBtn')?.addEventListener('click', () => {
+            this.exportReport();
         });
     }
 
@@ -174,6 +191,8 @@ class ScreenshotManager {
             const hideMenus = document.getElementById('hideMenusCheckbox')?.checked || false;
             const includeDateStamp = document.getElementById('includeDateStampCheckbox')?.checked || false;
             const resolution = parseFloat(document.getElementById('screenshotResolution')?.value || '2');
+            const format = String(document.getElementById('screenshotFormat')?.value || 'png').toLowerCase();
+            this.currentFormat = ['png', 'jpeg', 'webp'].includes(format) ? format : 'png';
 
             // Hide UI elements if requested
             if (hideMenus) {
@@ -184,7 +203,7 @@ class ScreenshotManager {
             await new Promise(resolve => setTimeout(resolve, 100));
 
             // Capture screenshot
-            const screenshot = await this.captureCanvas(resolution);
+            const screenshot = await this.captureCanvas(resolution, this.currentFormat);
 
             // Show UI elements again
             if (hideMenus) {
@@ -194,17 +213,28 @@ class ScreenshotManager {
             // Add date stamp if requested
             let finalScreenshot = screenshot;
             if (includeDateStamp) {
-                finalScreenshot = await this.addDateStamp(screenshot);
+                finalScreenshot = await this.addDateStamp(screenshot, this.currentFormat);
             }
 
             // Display preview
             this.displayPreview(finalScreenshot);
 
-            // Store screenshot for download
+            // Store screenshot and metadata for download/report
             this.currentScreenshot = finalScreenshot;
+            this.currentMetadata = {
+                capturedAt: new Date().toISOString(),
+                resolution,
+                format: this.currentFormat,
+                camera: this.tilesetViewer?.getCameraPosition?.() || null,
+                tilesetCount: this.tilesetViewer?.getAllTilesets?.()?.length || 0,
+                measurements: window.enhancedMeasurementManager?.getResults?.() || [],
+            };
 
-            // Show download button
-            document.getElementById('downloadScreenshotBtn').style.display = 'inline-flex';
+            // Show download and report buttons
+            const dlBtn = document.getElementById('downloadScreenshotBtn');
+            const rpBtn = document.getElementById('exportScreenshotReportBtn');
+            if (dlBtn) dlBtn.style.display = 'inline-flex';
+            if (rpBtn) rpBtn.style.display = 'inline-flex';
 
             if (window.notification) {
                 window.notification.success('Screenshot captured successfully');
@@ -227,9 +257,14 @@ class ScreenshotManager {
      * Capture canvas at specified resolution
      * Uses Cesium's render method to ensure scene is fully rendered
      */
-    async captureCanvas(resolution = 2) {
+    async captureCanvas(resolution = 2, format = 'png') {
         const viewer = this.tilesetViewer.viewer;
         const canvas = viewer.scene.canvas;
+        const fmt = ['png', 'jpeg', 'webp'].includes(String(format).toLowerCase())
+            ? String(format).toLowerCase()
+            : 'png';
+        const mimeType = `image/${fmt}`;
+        const quality = fmt === 'png' ? 1.0 : 0.92;
 
         // Ensure scene is rendered before capture
         viewer.render();
@@ -239,19 +274,18 @@ class ScreenshotManager {
 
         // Create offscreen canvas for high-res capture
         const offscreenCanvas = document.createElement('canvas');
-        offscreenCanvas.width = canvas.width * resolution;
-        offscreenCanvas.height = canvas.height * resolution;
+        offscreenCanvas.width = Math.max(1, Math.round(canvas.width * resolution));
+        offscreenCanvas.height = Math.max(1, Math.round(canvas.height * resolution));
 
         const ctx = offscreenCanvas.getContext('2d');
-
-        // Use image smoothing for better quality
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
-
-        // Draw the canvas scaled up
+        if (fmt === 'jpeg') {
+            ctx.fillStyle = '#0b1120';
+            ctx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+        }
         ctx.drawImage(canvas, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
 
-        // Convert to blob
         return new Promise((resolve, reject) => {
             offscreenCanvas.toBlob((blob) => {
                 if (blob) {
@@ -259,14 +293,19 @@ class ScreenshotManager {
                 } else {
                     reject(new Error('Failed to create blob'));
                 }
-            }, 'image/png', 1.0);
+            }, mimeType, quality);
         });
     }
 
     /**
      * Add date stamp to screenshot
      */
-    async addDateStamp(imageBlob) {
+    async addDateStamp(imageBlob, format = 'png') {
+        const fmt = ['png', 'jpeg', 'webp'].includes(String(format).toLowerCase())
+            ? String(format).toLowerCase()
+            : 'png';
+        const mimeType = `image/${fmt}`;
+        const quality = fmt === 'png' ? 1.0 : 0.92;
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
@@ -312,11 +351,16 @@ class ScreenshotManager {
                     } else {
                         reject(new Error('Failed to add date stamp'));
                     }
-                }, 'image/png', 1.0);
+                }, mimeType, quality);
             };
 
-            img.onerror = reject;
-            img.src = URL.createObjectURL(imageBlob);
+            img.onerror = (err) => {
+                URL.revokeObjectURL(objUrl);
+                reject(err);
+            };
+            const objUrl = URL.createObjectURL(imageBlob);
+            img.addEventListener('load', () => URL.revokeObjectURL(objUrl), { once: true });
+            img.src = objUrl;
         });
     }
 
@@ -344,9 +388,13 @@ class ScreenshotManager {
     hideUIElements() {
         this.hiddenElements = [];
 
-        // Elements to hide
+        // Elements to hide (covers both modern dock chrome and legacy classes)
         const selectors = [
             '.top-navbar',
+            '.smart3d-top-chrome',
+            '.smart3d-tools-dock',
+            '.dock-left:not(.collapsed)',
+            '.dock-right:not(.collapsed)',
             '.left-sidebar:not(.collapsed)',
             '.right-sidebar:not(.collapsed)',
             '.tools-menu-sidebar:not(.collapsed)',
@@ -355,7 +403,8 @@ class ScreenshotManager {
             '.property-info-panel',
             '.status-bar',
             '.selected-coordinate-overlay',
-            '.floating-controls-container'
+            '.floating-controls-container',
+            '#screenshotModal'
         ];
 
         selectors.forEach(selector => {
@@ -388,9 +437,11 @@ class ScreenshotManager {
     downloadScreenshot() {
         if (!this.currentScreenshot) return;
 
+        const extMap = { png: 'png', jpeg: 'jpg', webp: 'webp' };
+        const ext = extMap[this.currentFormat] || 'png';
         const date = new Date();
         const dateString = date.toISOString().replace(/[:.]/g, '-').slice(0, -5);
-        const filename = `meridian-screenshot-${dateString}.png`;
+        const filename = `meridian-screenshot-${dateString}.${ext}`;
 
         const url = URL.createObjectURL(this.currentScreenshot);
         const link = document.createElement('a');
@@ -404,6 +455,69 @@ class ScreenshotManager {
         if (window.notification) {
             window.notification.success('Screenshot downloaded');
         }
+    }
+
+    /**
+     * Export a self-contained HTML inspection report with screenshot, camera coordinates, and measurements.
+     */
+    async exportReport() {
+        if (!this.currentScreenshot) return null;
+        const dataUrl = await new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(String(r.result || ''));
+            r.onerror = () => reject(r.error || new Error('Failed to encode screenshot'));
+            r.readAsDataURL(this.currentScreenshot);
+        });
+        const meta = this.currentMetadata || {
+            capturedAt: new Date().toISOString(),
+            camera: this.tilesetViewer?.getCameraPosition?.() || null,
+            tilesetCount: this.tilesetViewer?.getAllTilesets?.()?.length || 0,
+            measurements: [],
+        };
+        const esc = (s) =>
+            String(s ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        const cam = meta.camera;
+        const camLine = cam
+            ? `${cam.lat}°, ${cam.lon}° · Altitude ${cam.height} m · Heading ${cam.heading}° · Pitch ${cam.pitch}°`
+            : 'Unavailable';
+        const measRows = (meta.measurements || [])
+            .map(
+                (m) =>
+                    `<tr><td>${esc(m.type)}</td><td>${esc(m.formatted || m.value || '—')}</td><td>${esc(m.pointCount)}</td></tr>`
+            )
+            .join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Meridian 3D Scene Report</title>
+<style>body{font-family:system-ui,-apple-system,sans-serif;margin:32px;background:#0f172a;color:#e2e8f0}
+h1{margin:0 0 6px;font-size:22px}p.meta{color:#94a3b8;font-size:13px;margin:4px 0}
+img{max-width:100%;border-radius:8px;border:1px solid #334155;margin:16px 0}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
+th,td{border:1px solid #334155;padding:8px 10px;text-align:left}th{background:#1e293b}</style></head>
+<body><h1>Meridian 3D Scene Report</h1>
+<p class="meta"><strong>Captured:</strong> ${esc(meta.capturedAt)}</p>
+<p class="meta"><strong>Camera:</strong> ${esc(camLine)}</p>
+<p class="meta"><strong>Loaded Tilesets:</strong> ${esc(meta.tilesetCount)}</p>
+<img src="${dataUrl}" alt="3D Scene Capture"/>
+${measRows ? `<h2>Measurements</h2><table><thead><tr><th>Type</th><th>Value</th><th>Points</th></tr></thead><tbody>${measRows}</tbody></table>` : ''}
+</body></html>`;
+
+        const dateString = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `meridian-report-${dateString}.html`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        window.notification?.success?.('Scene report exported');
+        return html;
     }
 
     /**

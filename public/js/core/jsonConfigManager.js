@@ -716,7 +716,11 @@ class JSONConfigManager {
                 modelAndLayerUploadManager: { enabled: true },
                 coordinateManager: { enabled: true },
                 featureInteractionManager: { enabled: true },
-                labelManager: { enabled: true }
+                labelManager: { enabled: true },
+                advancedTileLoading: { enabled: true },
+                performanceMonitor: { enabled: true },
+                collaborationManager: { enabled: true },
+                b3dmFeatureExtractor: { enabled: true }
             },
             ui: {
                 sidebars: {
@@ -781,18 +785,19 @@ class JSONConfigManager {
         const d = this.getDefaultConfig();
         if (!loaded || typeof loaded !== 'object') return d;
         const f = { ...d.features, ...loaded.features };
-        if (d.features.measurement || loaded.features?.measurement) {
-            f.measurement = { ...d.features.measurement, ...loaded.features?.measurement };
-        }
-        if (d.features.navigation || loaded.features?.navigation) {
-            f.navigation = { ...d.features.navigation, ...loaded.features?.navigation };
-        }
-        if (d.features.layers || loaded.features?.layers) {
-            f.layers = { ...d.features.layers, ...loaded.features?.layers };
-        }
-        if (d.features.collaboration || loaded.features?.collaboration) {
-            f.collaboration = { ...d.features.collaboration, ...loaded.features?.collaboration };
-        }
+        // Also support README shorthand: `tools: { measurement: { enabled }, navigation: { enabled }, layers: { enabled } }`
+        const toolShorthand = loaded.tools && typeof loaded.tools === 'object' ? loaded.tools : {};
+        ['measurement', 'navigation', 'layers', 'collaboration', 'labels'].forEach((fk) => {
+            const fromShorthand =
+                toolShorthand[fk] && typeof toolShorthand[fk] === 'object' ? toolShorthand[fk] : null;
+            if (d.features[fk] || loaded.features?.[fk] || fromShorthand) {
+                f[fk] = {
+                    ...(d.features[fk] || { enabled: true }),
+                    ...(fromShorthand || {}),
+                    ...(loaded.features?.[fk] || {}),
+                };
+            }
+        });
         const modules = this._mergeModulesObject(d.modules, loaded.modules);
         const ui = { ...d.ui, ...loaded.ui };
         if (d.ui.sidebars || loaded.ui?.sidebars) {
@@ -851,13 +856,29 @@ class JSONConfigManager {
             const n = typeof v === 'number' && !Number.isNaN(v) ? v : fallback;
             return Math.min(max, Math.max(min, n));
         };
+        const maxConcurrent = clamp(
+            typeof u.maxConcurrentRequests === 'number' ? u.maxConcurrentRequests : u.maximumRequestsPerServer,
+            1,
+            64,
+            b.maxConcurrentRequests || b.maximumRequestsPerServer || 6
+        );
         return {
+            tileCacheSize: clamp(u.tileCacheSize, 32, 10000, b.tileCacheSize || 500),
+            maxConcurrentRequests: maxConcurrent,
+            enableHorizonCulling:
+                typeof u.enableHorizonCulling === 'boolean'
+                    ? u.enableHorizonCulling
+                    : b.enableHorizonCulling !== false,
+            enableFrustumCulling:
+                typeof u.enableFrustumCulling === 'boolean'
+                    ? u.enableFrustumCulling
+                    : b.enableFrustumCulling !== false,
             renderLoopFrameBudgetMs: clamp(u.renderLoopFrameBudgetMs, 1, 16, b.renderLoopFrameBudgetMs),
             idleCallbackTimeoutMs: clamp(u.idleCallbackTimeoutMs, 100, 10000, b.idleCallbackTimeoutMs),
             deferredInitYieldMs: clamp(u.deferredInitYieldMs, 0, 100, b.deferredInitYieldMs),
             maximumRequestsPerServer: clamp(
-                u.maximumRequestsPerServer,
-                6,
+                typeof u.maximumRequestsPerServer === 'number' ? u.maximumRequestsPerServer : maxConcurrent,
+                1,
                 64,
                 b.maximumRequestsPerServer
             ),
@@ -900,6 +921,9 @@ class JSONConfigManager {
             typeof window.tilesetViewer.applyDisplayPerformanceSettings === 'function'
         ) {
             window.tilesetViewer.applyDisplayPerformanceSettings(p);
+        }
+        if (window.advancedTileLoading && typeof window.advancedTileLoading.applyConfig === 'function') {
+            window.advancedTileLoading.applyConfig({ performance: p });
         }
         try {
             if (
@@ -1263,8 +1287,12 @@ class JSONConfigManager {
      * Get configuration value by path
      */
     getConfig(path, defaultValue = null) {
+        const rootCfg = this.mergeAppConfigWithDefaults(this.configs.get('app'));
+        if (!path || typeof path !== 'string') {
+            return rootCfg;
+        }
         const parts = path.split('.');
-        let current = this.configs.get('app') || this.getDefaultConfig();
+        let current = rootCfg;
         
         for (const part of parts) {
             if (current && typeof current === 'object' && part in current) {

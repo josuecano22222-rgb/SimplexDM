@@ -35,42 +35,62 @@ class ShareLocationManager {
 
         const modal = document.createElement('div');
         modal.id = 'shareLocationModal';
-        modal.className = 'share-location-modal';
+        modal.className = 'share-location-modal map-tool-panel-overlay';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'shareLocationHeading');
         modal.style.display = 'none';
 
         modal.innerHTML = `
-            <div class="share-location-content">
-                <div class="share-location-header">
-                    <h2>Share Location</h2>
-                    <button class="close-btn" id="closeShareLocationBtn">×</button>
+            <div class="share-location-content sdm-tool-dialog">
+                <div class="share-location-header sdm-tool-header">
+                    <h2 id="shareLocationHeading">
+                        <i class="fas fa-share-alt" aria-hidden="true"></i>
+                        <span>Share Camera Location</span>
+                    </h2>
+                    <button type="button" class="close-btn" id="closeShareLocationBtn" aria-label="Close Share Location">×</button>
                 </div>
-                <div class="share-location-body">
-                    <div class="share-icon-container">
-                        <div class="share-icon">🔗</div>
-                    </div>
-                    
-                    <div class="share-description">
-                        Clicking this button will open the share window:
+                <div class="share-location-body sdm-tool-body">
+                    <div class="share-telemetry-card" id="shareTelemetryCard" aria-live="polite">
+                        <div class="share-tel-row"><span>WGS84</span><strong id="shareTelWgs84">—</strong></div>
+                        <div class="share-tel-row"><span>UTM</span><strong id="shareTelUtm">—</strong></div>
+                        <div class="share-tel-row"><span>Camera</span><strong id="shareTelOri">—</strong></div>
                     </div>
 
                     <div class="share-link-container">
-                        <button class="share-copy-btn" id="copyShareLinkBtn" title="Copy to Clipboard">
-                            <span class="copy-icon">📋</span>
+                        <button type="button" class="share-copy-btn" id="copyShareLinkBtn" title="Copy Share Link" aria-label="Copy share link">
+                            <i class="fas fa-copy" aria-hidden="true"></i>
                         </button>
-                        <input type="text" 
-                               id="shareLinkInput" 
-                               class="share-link-input" 
+                        <input type="text"
+                               id="shareLinkInput"
+                               class="share-link-input"
+                               aria-label="Shareable camera URL"
                                readonly
                                value="">
                         <div class="share-link-actions">
-                            <button class="share-action-btn" id="shareBrowserBtn" title="Open in Browser">🌐</button>
-                            <button class="share-action-btn" id="shareEmailBtn" title="Share via Email">✉️</button>
+                            <button type="button" class="share-action-btn" id="shareBrowserBtn" title="Open in New Window" aria-label="Open in new window">
+                                <i class="fas fa-external-link-alt" aria-hidden="true"></i>
+                            </button>
+                            <button type="button" class="share-action-btn" id="shareEmailBtn" title="Share via Email" aria-label="Share via email">
+                                <i class="fas fa-envelope" aria-hidden="true"></i>
+                            </button>
                         </div>
                     </div>
 
+                    <div class="share-export-strip">
+                        <button type="button" class="btn btn-xs btn-secondary" id="shareCopyGeoJsonBtn">
+                            <i class="fas fa-code" aria-hidden="true"></i> Copy GeoJSON
+                        </button>
+                        <button type="button" class="btn btn-xs btn-secondary" id="shareExportKmlBtn">
+                            <i class="fas fa-globe" aria-hidden="true"></i> Export KML
+                        </button>
+                        <button type="button" class="btn btn-xs btn-secondary" id="shareSaveBookmarkBtn">
+                            <i class="fas fa-bookmark" aria-hidden="true"></i> Bookmark View
+                        </button>
+                    </div>
+
                     <div class="share-info-section">
-                        <p>By copying and sharing this link, the model will open at the exact point and angle where the link was copied. You can also navigate to the point through the different navigation systems.</p>
-                        <p class="share-note"><strong>Note:</strong> The URL also allows launching the viewer from external systems, if necessary.</p>
+                        <p>Opening this link restores the exact 3D camera position, altitude, heading, pitch, and roll for reproducible inspection across workstations.</p>
                     </div>
                 </div>
             </div>
@@ -108,6 +128,105 @@ class ShareLocationManager {
         document.getElementById('modalCloseBtn')?.addEventListener('click', () => this.hide());
         document.getElementById('shareCopy')?.addEventListener('click', () => this.copyToClipboard());
         document.getElementById('shareOSM')?.addEventListener('click', () => this.openOpenStreetMap());
+        document.getElementById('shareCopyGeoJsonBtn')?.addEventListener('click', () => this.copyGeoJson());
+        document.getElementById('shareExportKmlBtn')?.addEventListener('click', () => this.exportKml());
+        document.getElementById('shareSaveBookmarkBtn')?.addEventListener('click', () => {
+            window.bookmarkManager?.addBookmark?.();
+            window.notification?.success?.('Saved camera view to Bookmarks');
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const open =
+                    (this.shareModal && this.shareModal.style.display !== 'none') ||
+                    (document.getElementById('modalDiv')?.style.display === 'flex');
+                if (open) this.hide();
+            }
+        });
+    }
+
+    _getCameraSnapshot() {
+        if (!this.tilesetViewer && typeof window !== 'undefined') {
+            this.tilesetViewer = window.tilesetViewer;
+        }
+        const camera = this.tilesetViewer?.viewer?.camera;
+        if (!camera || typeof Cesium === 'undefined') return null;
+        const c = Cesium.Cartographic.fromCartesian(camera.position);
+        const lon = Cesium.Math.toDegrees(c.longitude);
+        const lat = Cesium.Math.toDegrees(c.latitude);
+        const height = c.height || 0;
+        const heading = ((Cesium.Math.toDegrees(camera.heading) % 360) + 360) % 360;
+        const pitch = Cesium.Math.toDegrees(camera.pitch);
+        const roll = Cesium.Math.toDegrees(camera.roll);
+        const utm = window.CoordinateManager?.wgs84ToUtm?.(lon, lat) || null;
+        return { lon, lat, height, heading, pitch, roll, utm };
+    }
+
+    async copyGeoJson() {
+        const snap = this._getCameraSnapshot();
+        if (!snap) return false;
+        const feature = {
+            type: 'Feature',
+            geometry: {
+                type: 'Point',
+                coordinates: [
+                    Number(snap.lon.toFixed(7)),
+                    Number(snap.lat.toFixed(7)),
+                    Number(snap.height.toFixed(2)),
+                ],
+            },
+            properties: {
+                heading: Number(snap.heading.toFixed(2)),
+                pitch: Number(snap.pitch.toFixed(2)),
+                roll: Number(snap.roll.toFixed(2)),
+                utm: snap.utm ? snap.utm.formatted : undefined,
+                shareUrl: this.generateShareUrl(),
+                exportedAt: new Date().toISOString(),
+            },
+        };
+        try {
+            await navigator.clipboard?.writeText(JSON.stringify(feature, null, 2));
+            window.notification?.success?.('Copied camera GeoJSON to clipboard');
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    exportKml() {
+        const snap = this._getCameraSnapshot();
+        if (!snap) return false;
+        const kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Meridian Camera Viewpoint</name>
+    <Placemark>
+      <name>Viewpoint (${snap.lat.toFixed(5)}, ${snap.lon.toFixed(5)})</name>
+      <Camera>
+        <longitude>${snap.lon.toFixed(7)}</longitude>
+        <latitude>${snap.lat.toFixed(7)}</latitude>
+        <altitude>${snap.height.toFixed(2)}</altitude>
+        <heading>${snap.heading.toFixed(2)}</heading>
+        <tilt>${Math.max(0, Math.min(180, 90 + snap.pitch)).toFixed(2)}</tilt>
+        <roll>${snap.roll.toFixed(2)}</roll>
+        <altitudeMode>absolute</altitudeMode>
+      </Camera>
+      <Point>
+        <coordinates>${snap.lon.toFixed(7)},${snap.lat.toFixed(7)},${snap.height.toFixed(2)}</coordinates>
+      </Point>
+    </Placemark>
+  </Document>
+</kml>`;
+        const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `meridian-viewpoint-${Date.now()}.kml`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        window.notification?.success?.('Exported KML viewpoint');
+        return true;
     }
 
     /**
@@ -128,25 +247,31 @@ class ShareLocationManager {
      * Show share modal and generate URL
      */
     show() {
+        if (!this.tilesetViewer && typeof window !== 'undefined') {
+            this.tilesetViewer = window.tilesetViewer;
+        }
         if (!this.tilesetViewer || !this.tilesetViewer.viewer) {
-            if (window.notification) {
-                window.notification.error(window.appI18n?.nt ? window.appI18n.nt('viewerNotReady') : 'Viewer not ready');
-            }
+            window.notification?.error?.(
+                window.appI18n?.nt ? window.appI18n.nt('viewerNotReady') : 'Viewer not ready'
+            );
             return;
         }
 
         const url = this.generateShareUrl();
         const input = document.getElementById('shareLinkInput');
-        if (input) {
-            input.value = url;
+        if (input) input.value = url;
+
+        const snap = this._getCameraSnapshot();
+        if (snap) {
+            const wgs = document.getElementById('shareTelWgs84');
+            const utm = document.getElementById('shareTelUtm');
+            const ori = document.getElementById('shareTelOri');
+            if (wgs) wgs.textContent = `${snap.lat.toFixed(6)}°, ${snap.lon.toFixed(6)}° · ${snap.height.toFixed(1)} m`;
+            if (utm) utm.textContent = snap.utm ? `${snap.utm.formatted} (${snap.utm.epsg})` : 'Polar zone';
+            if (ori) ori.textContent = `Hdg ${snap.heading.toFixed(1)}° · Pitch ${snap.pitch.toFixed(1)}°`;
         }
 
-        const modalDiv = document.getElementById('modalDiv');
-        const modalMsg = document.getElementById('modalMsg');
-        if (modalDiv) {
-            if (modalMsg) modalMsg.textContent = url;
-            modalDiv.style.display = 'flex';
-        } else if (this.shareModal) {
+        if (this.shareModal) {
             this.shareModal.style.display = 'flex';
         }
     }

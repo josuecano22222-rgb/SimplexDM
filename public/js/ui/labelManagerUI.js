@@ -268,31 +268,39 @@
                 return;
             }
 
+            const escHtml = (s) =>
+                String(s ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+
             list.innerHTML = this._installedList
                 .map((r) => {
                     const en = r.enabled !== false;
-                    const meta =
+                    const safeId = escHtml(r.id);
+                    const safeLabel = escHtml(r.name || r.id);
+                    const meta = escHtml(
                         (r.count ? Number(r.count).toLocaleString() + ' · ' : '') +
-                        (r.zoom && r.zoom.length === 2 ? 'z' + r.zoom[0] + '–' + r.zoom[1] : '');
+                            (r.zoom && r.zoom.length === 2 ? 'z' + r.zoom[0] + '–' + r.zoom[1] : '')
+                    );
                     return (
                         '<div class="lm-region-row" data-id="' +
-                        String(r.id).replace(/"/g, '&quot;') +
+                        safeId +
                         '">' +
                         '<label class="lm-region-toggle">' +
                         '<input type="checkbox" class="lm-region-check" data-id="' +
-                        String(r.id).replace(/"/g, '&quot;') +
+                        safeId +
                         '"' +
                         (en ? ' checked' : '') +
                         '>' +
                         '<span class="lm-region-name">' +
-                        String(r.id) +
+                        safeLabel +
                         '</span>' +
-                        (meta
-                            ? '<span class="lm-region-meta">' + meta + '</span>'
-                            : '') +
+                        (meta ? '<span class="lm-region-meta">' + meta + '</span>' : '') +
                         '</label>' +
                         '<button type="button" class="lm-btn-icon lm-region-remove" data-id="' +
-                        String(r.id).replace(/"/g, '&quot;') +
+                        safeId +
                         '" data-i18n-title="ui.labels.removeRegionTitle" title="Remove">' +
                         '<i class="fas fa-trash" aria-hidden="true"></i></button></div>'
                     );
@@ -535,21 +543,31 @@
             }
         }
 
-        async _importRegion() {
+        async _importRegion(explicitRlpPath) {
             const api = this._labelsApi();
-            if (!api) return;
+            if (!api) return null;
             try {
-                const result = await api.importRegion();
+                const result = await api.importRegion(typeof explicitRlpPath === 'string' ? explicitRlpPath : undefined);
                 if (result && !result.canceled) {
                     await this._loadInstalledRegions();
-                    if (global.labelManager) global.labelManager.refresh();
+                    const activeIds = this._installedList.filter((x) => x.enabled !== false).map((x) => x.id);
+                    if (global.labelManager) {
+                        global.labelManager.setActiveRegions(activeIds);
+                        global.labelManager.refresh();
+                    }
                 }
+                return result;
             } catch (err) {
                 console.error('[LabelManagerUI] import error:', err);
                 if (global.notification && typeof global.notification.error === 'function') {
                     global.notification.error(err.message || String(err));
                 }
+                return null;
             }
+        }
+
+        async importRegionFile(rlpPath) {
+            return await this._importRegion(rlpPath);
         }
 
         async _onRegionToggle(regionId, enabled) {
