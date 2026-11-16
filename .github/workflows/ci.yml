@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
-    name: Syntax, i18n, Tests & Production Bundle
+  verify-linux:
+    name: Linux (Node 22 + Python 3.11)
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -34,9 +34,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies (preserve Node ABI for tests)
-        env:
-          SKIP_ELECTRON_REBUILD: '1'
+      - name: Install dependencies
         run: npm ci
 
       - name: Verify Cesium runtime & workspace setup
@@ -69,3 +67,74 @@ jobs:
           test -f build/icon.ico
           test -f build/icon.icns
           ls public-bundled/js/bundle.*.js
+
+  verify-windows:
+    name: Windows (Node 24 + Electron + No-Python & WASM)
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies (simulate npm blocked-scripts / no Visual Studio)
+        run: npm ci --ignore-scripts
+
+      - name: Verify postinstall & Cesium setup (no DEP0190, no C++ compiler)
+        env:
+          CI: ''
+          GITHUB_ACTIONS: ''
+        run: |
+          node --throw-deprecation scripts/setup.js --copy-cesium
+          node --throw-deprecation scripts/ensure-electron.js --required
+          node -e "const fs=require('fs'),e=require('electron');console.log('Electron binary:',e);if(!fs.existsSync(e))process.exit(1);"
+
+      - name: Verify Electron & Node 24 better-sqlite3 prebuild switching
+        run: |
+          node --throw-deprecation scripts/rebuild-native.js --electron
+          node --throw-deprecation scripts/rebuild-native.js
+          node -e "const D=require('./main/gis/services/sqliteDriver');const {GeoPackageService}=require('./main/gis/services/GeoPackageService');const {CrsService}=require('./main/gis/services/CrsService');const g=new GeoPackageService({crsService:new CrsService()});console.log('Drivers:',D.driverName,g.adapterName);if(D.driverName!=='better-sqlite3'||g.adapterName!=='better-sqlite3')process.exit(1);"
+
+      - name: Verify EN/AR i18n parity
+        run: npm run i18n:check
+
+      - name: Run Jest suite on Windows Node 24 (native SQLite + zero Python + installed Ion SDK)
+        env:
+          SKIP_PYTHON_TOOLS: '1'
+        shell: pwsh
+        run: |
+          $ionDir = "public/lib/cesium/packages/ion-sdk-measurements/Build/IonSdkMeasurements"
+          New-Item -ItemType Directory -Force -Path $ionDir | Out-Null
+          Set-Content -Path "$ionDir/IonSdkMeasurements.js" -Value "/* local Ion SDK addon */"
+          try {
+            npm run test:coverage -- --ci --runInBand
+          } finally {
+            Remove-Item -Recurse -Force "public/lib/cesium/packages" -ErrorAction SilentlyContinue
+          }
+
+      - name: Run Jest suite on Windows Node 24 (WASM GeoPackage + node:sqlite fallback)
+        env:
+          SKIP_PYTHON_TOOLS: '1'
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force "node_modules/better-sqlite3/build" -ErrorAction SilentlyContinue
+          npx jest --ci --runInBand
+
+      - name: Build brand assets & production Webpack bundle on Windows
+        run: npm run webpack
+
+      - name: Verify Windows bundle artifacts
+        shell: pwsh
+        run: |
+          foreach ($f in @("public-bundled/index.html","public-bundled/landing.html","public-bundled/admin.html","build/icon.ico","build/icon.png")) {
+            if (-not (Test-Path $f)) { throw "Missing artifact: $f" }
+          }
+          $bundles = Get-ChildItem "public-bundled/js/bundle.*.js"
+          if ($bundles.Count -lt 1) { throw "Missing production bundle" }
+          Write-Host "Verified bundle: $($bundles[0].Name)"

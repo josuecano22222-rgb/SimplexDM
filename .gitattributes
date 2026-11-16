@@ -1,0 +1,35 @@
+# Normalize text line endings to LF across Windows, macOS, and Linux
+* text=auto eol=lf
+
+# Windows batch & installer scripts keep CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary geospatial, SQLite, 3D Tiles, font, archive, and image assets
+*.db binary
+*.sqlite binary
+*.gpkg binary
+*.rlp binary
+*.b3dm binary
+*.i3dm binary
+*.pnts binary
+*.cmpt binary
+*.glb binary
+*.pbf binary
+*.mvt binary
+*.tif binary
+*.tiff binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.zip binary
+*.gz binary
+*.wasm binary

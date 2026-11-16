@@ -31,11 +31,13 @@
     "!**/{appveyor.yml,.travis.yml,circle.yml}",
     "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
   ],
+  "npmRebuild": false,
   "asar": true,
   "asarUnpack": [
     "server/**/*",
     "main/gis/workers/**/*",
     "node_modules/better-sqlite3/**/*",
+    "node_modules/rtree-sql.js/dist/**/*",
     "node_modules/jsts/dist/**/*"
   ],
   "extraFiles": [

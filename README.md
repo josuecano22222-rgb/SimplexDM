@@ -40,17 +40,19 @@
 ## Quick Start
 
 ### Prerequisites
-- **Node.js** `>= 16.0.0` (Node 20/22 LTS recommended) and **npm** `>= 7.0.0`
-- **Python** `>= 3.8` *(optional — only needed to download custom offline OSM raster tiles or compile custom `.rlp` label packs)*
+- **Node.js** `>= 18.0.0` (Node 20, 22, and 24 LTS supported on Windows, macOS, and Linux) and **npm** `>= 9.0.0` (including npm v11/v12 `allowScripts`)
+- **No C++ compiler / Visual Studio Build Tools required:** `better-sqlite3` fetches official prebuilt binaries automatically for both Node.js and Electron, and cleanly falls back to Node's built-in `node:sqlite` + bundled WebAssembly `rtree-sql.js` (for OGC GeoPackage) when offline.
+- **No Python required** to install, launch, run `npm test` / `npm run test:coverage`, or build label packs and tile metadata (`npm run labels:build`, `npm run labels:pack`, `npm run tiles:meta`). Python `>= 3.8` is optional for downloading live OSM raster tiles (`data/map_offline.py`) or running the Python ETL scripts directly.
 
 ### Installation & Running
 
 ```bash
-# 1. Install dependencies (automatically initializes data directories & native modules)
+# 1. Install dependencies (initializes data directories, Cesium, Electron runtime & SQLite prebuilds)
 npm install
 
-# 2. Launch the desktop app (Electron)
-npm run electron:dev
+# 2. Launch the desktop app (Electron — automatically verifies Electron binary & Electron SQLite prebuild)
+npm run dev
+# (alias: npm run electron:dev)
 
 # — OR — Launch as a standalone local web server (default port 8000, auto-finds open port)
 npm start
@@ -73,16 +75,17 @@ Environment variables for `server/server.js` / Electron:
 ## Offline Maps & Label Pack Workflows
 
 ```bash
-# Download offline OpenStreetMap raster tiles for a region & zoom range
+# Compile a custom world label DB or regional .rlp pack (Node.js — zero Python needed)
+npm run labels:build -- --geojson places.geojson --out data/labels-world-base.db
+npm run labels:pack -- --db data/labels-world-base.db --id my-city --name "My City" --west 4.7 --south 52.2 --east 5.1 --north 52.5 --out my-city.rlp
+npm run tiles:meta -- --dir data/tiles
+
+# Optional Python tools: download offline OpenStreetMap raster tiles (use `python` on Windows, `python3` on macOS/Linux)
 python3 data/map_offline.py --bbox 4.72,52.28,5.08,52.44 --min-zoom 0 --max-zoom 13 --out data/tiles
 python3 data/update_meta.py
 
-# Regenerate the bundled world label SQLite DB + Amsterdam sample .rlp pack
+# Regenerate the bundled world label SQLite DB + Amsterdam sample .rlp pack (requires Python 3.8+)
 npm run seed:labels
-
-# Compile a custom world label DB or regional .rlp pack from GeoJSON/CSV/OSM PBF
-python3 scripts/build_world_labels.py --input places.geojson --output data/labels-world-base.db
-python3 scripts/pack_region.py --input city.geojson --id my-city --name "My City" --output my-city.rlp
 
 # Regenerate the bundled Meridian Campus 3D Tiles 1.1 sample (.b3dm/.i3dm/.pnts/.cmpt)
 npm run seed:samples
